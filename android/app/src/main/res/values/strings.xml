@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Bedrock</string>
+    <string name="accessibility_service_description">
+        During your scheduled bedtime, Bedrock watches which app comes to the
+        front and returns you to the night clock if the app is blocked. It
+        only sees which app is open - never what is on your screen. It does
+        nothing outside your bedtime window.
+    </string>
+</resources>
