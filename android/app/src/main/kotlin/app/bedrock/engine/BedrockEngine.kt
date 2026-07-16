@@ -3,6 +3,7 @@ package app.bedrock.engine
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import app.bedrock.billing.BillingManager
 import app.bedrock.blocking.Allowlist
 import app.bedrock.blocking.BlockingController
 import app.bedrock.channel.EngineEventStreamer
@@ -11,6 +12,7 @@ import app.bedrock.controllers.GrayscaleController
 import app.bedrock.controllers.WindDownOverlayController
 import app.bedrock.service.AlarmScheduler
 import app.bedrock.service.LockdownForegroundService
+import app.bedrock.ui.EscapeFlowActivity
 import app.bedrock.ui.NightClockActivity
 import java.time.Instant
 import java.time.ZoneId
@@ -30,6 +32,12 @@ class BedrockEngine private constructor(private val context: Context) {
     private val dnd = DndController(context)
     private val overlay = WindDownOverlayController(context)
     val grayscale = GrayscaleController(context)
+    val billing = BillingManager(context) { dispatch(SessionEvent.BypassPurchased) }
+
+    init {
+        // Crash between purchase and consume must never strand a paid user.
+        billing.reconcile()
+    }
 
     @Synchronized
     fun evaluate(nowMs: Long = System.currentTimeMillis()) {
@@ -114,6 +122,8 @@ class BedrockEngine private constructor(private val context: Context) {
             SessionState.IDLE, SessionState.WINDDOWN -> scheduler.scheduleBoundaries(
                 nowMs,
                 AlarmScheduler.ACTION_WINDDOWN to windDown,
+                AlarmScheduler.ACTION_WARN_15 to bed - 15 * 60_000L,
+                AlarmScheduler.ACTION_WARN_1 to bed - 60_000L,
                 AlarmScheduler.ACTION_BEDTIME to bed,
                 AlarmScheduler.ACTION_WAKE to wake,
             )
@@ -153,6 +163,8 @@ class BedrockEngine private constructor(private val context: Context) {
             Effect.StopBlocking -> {
                 BlockingController.update(context, active = false, allowed = emptySet(), wakeLabel = "")
                 grayscale.setGrayscale(false)
+                NightClockActivity.closeIfShowing()
+                EscapeFlowActivity.closeIfShowing()
             }
             Effect.StartWindDown -> {
                 snapshot.night?.let {

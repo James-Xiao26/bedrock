@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.telecom.TelecomManager
+import android.view.inputmethod.InputMethodManager
 
 /**
  * Which packages stay reachable during lockdown. Two layers:
@@ -33,9 +34,22 @@ class Allowlist(private val context: Context) {
             add("com.android.incallui")
 
             addAll(homePackages())
+            addAll(imePackages())
         }
         return system + userAllowlist
     }
+
+    /**
+     * Enabled keyboards: the accessibility service sees the IME window as a
+     * foreground package, and bouncing it would make the escape-phrase field
+     * (and any allowlisted app) untypeable.
+     */
+    private fun imePackages(): Set<String> =
+        context.getSystemService(InputMethodManager::class.java)
+            ?.enabledInputMethodList
+            ?.map { it.packageName }
+            ?.toSet()
+            ?: emptySet()
 
     /**
      * Every installed home-screen app, not just the current default: the

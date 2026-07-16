@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import app.bedrock.engine.BedrockEngine
 import app.bedrock.engine.SessionEvent
+import app.bedrock.service.AlarmScheduler
+import app.bedrock.service.receivers.AlarmReceiver
 
 /**
  * Debug-build-only adb hook for E2E scripts (this source set never ships):
@@ -31,6 +33,17 @@ class DemoReceiver : BroadcastReceiver() {
                 "AlarmSnoozed" -> engine.dispatch(SessionEvent.AlarmSnoozed)
             }
             "app.bedrock.debug.EVALUATE" -> engine.evaluate()
+            // Exercise the real AlarmReceiver -> notification path without
+            // waiting out a genuine T-15/T-1 alarm.
+            "app.bedrock.debug.WARN" -> context.sendBroadcast(
+                Intent(context, AlarmReceiver::class.java).setAction(
+                    if (intent.getIntExtra("minutes", 15) == 1) {
+                        AlarmScheduler.ACTION_WARN_1
+                    } else {
+                        AlarmScheduler.ACTION_WARN_15
+                    },
+                ),
+            )
         }
     }
 }

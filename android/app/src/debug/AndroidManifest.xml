@@ -14,6 +14,7 @@
                 <action android:name="app.bedrock.debug.DEMO"/>
                 <action android:name="app.bedrock.debug.EVENT"/>
                 <action android:name="app.bedrock.debug.EVALUATE"/>
+                <action android:name="app.bedrock.debug.WARN"/>
             </intent-filter>
         </receiver>
     </application>

@@ -60,6 +60,9 @@ class AlarmScheduler(private val context: Context) {
         const val ACTION_WINDDOWN = "app.bedrock.alarm.WINDDOWN"
         const val ACTION_BEDTIME = "app.bedrock.alarm.BEDTIME"
         const val ACTION_WAKE = "app.bedrock.alarm.WAKE"
-        private val ACTIONS = listOf(ACTION_WINDDOWN, ACTION_BEDTIME, ACTION_WAKE)
+        const val ACTION_WARN_15 = "app.bedrock.alarm.WARN_15"
+        const val ACTION_WARN_1 = "app.bedrock.alarm.WARN_1"
+        private val ACTIONS =
+            listOf(ACTION_WINDDOWN, ACTION_BEDTIME, ACTION_WAKE, ACTION_WARN_15, ACTION_WARN_1)
     }
 }

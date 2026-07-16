@@ -22,6 +22,9 @@ class HomeScreen extends ConsumerWidget {
           const SizedBox(height: 16),
           Text('Schedule', style: Theme.of(context).textTheme.titleLarge),
           const ScheduleEditor(),
+          const Divider(height: 32),
+          Text('Settings', style: Theme.of(context).textTheme.titleLarge),
+          const _SettingsSection(),
           if (kDebugMode) ...[
             const Divider(height: 32),
             Text('Debug', style: Theme.of(context).textTheme.titleLarge),
@@ -40,6 +43,39 @@ class HomeScreen extends ConsumerWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _SettingsSection extends ConsumerWidget {
+  const _SettingsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final config = ref.watch(configProvider).valueOrNull;
+    if (config == null) return const SizedBox.shrink();
+    final engine = ref.read(engineChannelProvider);
+
+    return Column(
+      children: [
+        SwitchListTile(
+          title: const Text('Hardcore mode'),
+          subtitle: const Text(
+            'The only way out of a locked night is the \$1 emergency bypass. '
+            'Turning this off takes effect tomorrow morning.',
+          ),
+          value: config.active.mode == Mode.hardcore,
+          onChanged: (v) => engine.updateConfig(
+            ConfigPatch(mode: v ? Mode.hardcore : Mode.normal),
+          ),
+        ),
+        SwitchListTile(
+          title: const Text('Wake-up alarm'),
+          subtitle: const Text('Ring at wake time; snoozing keeps the lock on.'),
+          value: config.active.alarmEnabled,
+          onChanged: (v) => engine.updateConfig(ConfigPatch(alarmEnabled: v)),
+        ),
+      ],
     );
   }
 }

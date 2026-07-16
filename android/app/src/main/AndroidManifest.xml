@@ -73,6 +73,13 @@
             android:launchMode="singleInstance"
             android:theme="@android:style/Theme.Material.NoActionBar"/>
 
+        <activity
+            android:name=".ui.EscapeFlowActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Material.NoActionBar"/>
+
         <service
             android:name=".service.LockdownForegroundService"
             android:exported="false"

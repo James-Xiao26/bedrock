@@ -33,6 +33,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import app.bedrock.BuildConfig
+import app.bedrock.blocking.BlockingController
 import kotlinx.coroutines.delay
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -68,10 +69,25 @@ class NightClockActivity : ComponentActivity() {
                 NightClockScreen(
                     wakeLabel = wakeLabel,
                     onEmergencyCall = ::openDialer,
+                    onEscape = {
+                        startActivity(Intent(this, EscapeFlowActivity::class.java))
+                    },
                     onDebugExit = if (BuildConfig.DEBUG) ::finish else null,
                 )
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        showing = this
+        // The night may have ended while we were off-screen.
+        if (!BlockingController.isActive(this)) finish()
+    }
+
+    override fun onStop() {
+        if (showing === this) showing = null
+        super.onStop()
     }
 
     private fun openDialer() {
@@ -81,6 +97,14 @@ class NightClockActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_WAKE_LABEL = "wake_label"
+
+        private var showing: NightClockActivity? = null
+
+        /** Called by the engine when blocking ends so the clock gets out of the way. */
+        fun closeIfShowing() {
+            showing?.finish()
+            showing = null
+        }
     }
 }
 
@@ -88,6 +112,7 @@ class NightClockActivity : ComponentActivity() {
 private fun NightClockScreen(
     wakeLabel: String,
     onEmergencyCall: () -> Unit,
+    onEscape: () -> Unit,
     onDebugExit: (() -> Unit)?,
 ) {
     var now by remember { mutableStateOf(LocalTime.now()) }
@@ -129,6 +154,9 @@ private fun NightClockScreen(
         ) {
             OutlinedButton(onClick = onEmergencyCall) {
                 Text("Emergency call", color = Color(0xFF8A8A9E))
+            }
+            OutlinedButton(onClick = onEscape) {
+                Text("I need my phone", color = Color(0xFF5A5A6E))
             }
             if (onDebugExit != null) {
                 OutlinedButton(onClick = onDebugExit) {
