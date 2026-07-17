@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'src/features/home/home_screen.dart';
+import 'src/features/shell/app_shell.dart';
+import 'src/theme/app_theme.dart';
 
 void main() {
   runApp(const ProviderScope(child: BedrockApp()));
@@ -14,14 +15,9 @@ class BedrockApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Bedrock',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF5C6BC0),
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
-      home: const HomeScreen(),
+      debugShowCheckedModeBanner: false,
+      theme: buildBedrockTheme(),
+      home: const AppShell(),
     );
   }
 }

@@ -90,12 +90,29 @@ void main() {
     });
   });
 
-  testWidgets('app boots, shows status and schedule', (tester) async {
+  testWidgets('app boots into the Tonight dashboard', (tester) async {
     await tester.pumpWidget(const ProviderScope(child: BedrockApp()));
     await tester.pumpAndSettle();
-    expect(find.text('Bedrock'), findsOneWidget);
+    // Hero status card reflects the IDLE session.
     expect(find.text('Awake'), findsOneWidget);
+    // Bottom navigation exposes the three tabs.
+    expect(find.text('Tonight'), findsOneWidget);
+    expect(find.text('Schedule'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
+  });
+
+  testWidgets('schedule tab lists every weekday with time chips',
+      (tester) async {
+    await tester.pumpWidget(const ProviderScope(child: BedrockApp()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Schedule'));
+    await tester.pumpAndSettle();
     expect(find.text('Monday'), findsOneWidget);
-    expect(find.text('Bed 23:00'), findsNWidgets(7));
+    // Day cards carry Bed and Wake time chips.
+    expect(find.text('Bed'), findsWidgets);
+    expect(find.text('Wake'), findsWidgets);
+    // The last weekday is reachable by scrolling.
+    await tester.scrollUntilVisible(find.text('Sunday'), 200);
+    expect(find.text('Sunday'), findsOneWidget);
   });
 }
