@@ -42,7 +42,7 @@ class EngineChannel {
   }
 
   /// The hardcore escape code, if the engine will currently reveal it.
-  /// Hidden (password == null) past the daily cutoff or during a locked night.
+  /// Hidden (password == null) only while a window is actively blocking.
   Future<HardcorePasswordView> getHardcorePassword() async {
     final wire = await _method
         .invokeMethod<Map<Object?, Object?>>('getHardcorePassword');

@@ -14,7 +14,6 @@ String _activeConfigJson() => jsonEncode({
           '$day': {'bedMinutes': 23 * 60, 'wakeMinutes': 7 * 60, 'enabled': true},
       },
       'allowlist': <String>[],
-      'passwordViewCutoffMinutes': 15 * 60,
     });
 
 void main() {
@@ -73,7 +72,6 @@ void main() {
     final view = await EngineChannel().getConfig();
     expect(view.active.schedule.length, 7);
     expect(view.active.schedule[1]!.bedMinutes, 23 * 60);
-    expect(view.active.passwordViewCutoffMinutes, 15 * 60);
     expect(view.hasPendingChanges, isFalse);
   });
 
@@ -104,18 +102,24 @@ void main() {
     expect(find.text('Settings'), findsOneWidget);
   });
 
-  testWidgets('schedule tab lists every weekday with time chips',
+  testWidgets('schedule tab shows the Downtime editor in Every Day mode',
       (tester) async {
     await tester.pumpWidget(const ProviderScope(child: BedrockApp()));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Schedule'));
     await tester.pumpAndSettle();
+    // Master toggle + Every Day/Customize selector, defaulting to a single
+    // Time row (all seven days share one window).
+    expect(find.text('Scheduled'), findsOneWidget);
+    expect(find.text('Every Day'), findsOneWidget);
+    expect(find.text('Customize Days'), findsOneWidget);
+    expect(find.text('Time'), findsOneWidget);
+    // Per-day rows only appear after switching to Customize.
+    expect(find.text('Monday'), findsNothing);
+    await tester.tap(find.text('Customize Days'));
+    await tester.pumpAndSettle();
     expect(find.text('Monday'), findsOneWidget);
-    // Day cards carry Start and End time chips.
-    expect(find.text('Start'), findsWidgets);
-    expect(find.text('End'), findsWidgets);
-    // The last weekday is reachable by scrolling.
-    await tester.scrollUntilVisible(find.text('Sunday'), 200);
-    expect(find.text('Sunday'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Saturday'), 200);
+    expect(find.text('Saturday'), findsOneWidget);
   });
 }

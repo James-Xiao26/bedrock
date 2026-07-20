@@ -85,10 +85,7 @@ class BedrockEngine private constructor(private val context: Context) {
 
     @Synchronized
     fun updateConfig(requested: ConfigPatch, nowMs: Long = System.currentTimeMillis()): ChangeClassifier.Result {
-        val config = store.activeConfig()
-        val tonight = NightPlanner.nextNight(nowMs, zone(), config)?.day
-            ?: Instant.ofEpochMilli(nowMs).atZone(zone()).dayOfWeek.value
-        val result = store.update(requested, tonight)
+        val result = store.update(requested)
         EngineEventStreamer.emit("configChanged")
         evaluate(nowMs)
         return result
@@ -134,13 +131,13 @@ class BedrockEngine private constructor(private val context: Context) {
         HardcorePassword.matches(input, store.hardcorePassword())
 
     /**
-     * The passcode, but only when the app is allowed to reveal it: before
-     * today's cutoff and never while a window is actively blocking. Returns
-     * the flag plus the code (null when hidden) for the settings screen.
+     * The passcode, but only when the app is allowed to reveal it: never while
+     * a window is actively blocking (that would defeat the blocker). Returns the
+     * flag plus the code (null when hidden) for the settings screen.
      */
     @Synchronized
-    fun hardcorePasswordView(nowMs: Long = System.currentTimeMillis()): Map<String, Any?> {
-        val viewable = passwordViewable(nowMs)
+    fun hardcorePasswordView(): Map<String, Any?> {
+        val viewable = passwordViewable()
         return mapOf(
             "viewable" to viewable,
             "password" to if (viewable) store.hardcorePassword() else null,
@@ -148,8 +145,8 @@ class BedrockEngine private constructor(private val context: Context) {
     }
 
     @Synchronized
-    fun regenerateHardcorePassword(nowMs: Long = System.currentTimeMillis()): Map<String, Any?> {
-        if (!passwordViewable(nowMs)) return mapOf("viewable" to false, "password" to null)
+    fun regenerateHardcorePassword(): Map<String, Any?> {
+        if (!passwordViewable()) return mapOf("viewable" to false, "password" to null)
         return mapOf("viewable" to true, "password" to store.rotateHardcorePassword())
     }
 
@@ -159,12 +156,7 @@ class BedrockEngine private constructor(private val context: Context) {
         onCodeReset?.invoke(fresh)
     }
 
-    private fun passwordViewable(nowMs: Long): Boolean =
-        !store.snapshot().blocking &&
-            localMinutes(nowMs) < store.activeConfig().passwordViewCutoffMinutes
-
-    private fun localMinutes(nowMs: Long): Int =
-        Instant.ofEpochMilli(nowMs).atZone(zone()).toLocalTime().let { it.hour * 60 + it.minute }
+    private fun passwordViewable(): Boolean = !store.snapshot().blocking
 
     /** Debug builds only: open a window now and close it after a few seconds. */
     @Synchronized

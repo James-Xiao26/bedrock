@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../engine/engine_models.dart';
 import '../../engine/engine_providers.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/section_card.dart';
@@ -31,9 +30,7 @@ class SettingsScreen extends ConsumerWidget {
           const Center(child: CircularProgressIndicator())
         else ...[
           const SectionLabel('Passcode'),
-          _PasscodeSection(
-            cutoffMinutes: config.active.passwordViewCutoffMinutes,
-          ),
+          const _PasscodeSection(),
           if (kDebugMode) ...[
             const SizedBox(height: 24),
             const SectionLabel('Debug'),
@@ -51,78 +48,41 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
-/// Shows the current passcode while it is allowed to be seen, lets the user
-/// roll a new one, and edits the daily visibility cutoff. The passcode gates
-/// per-app time grants during a window.
+/// Shows the current passcode and lets the user roll a new one. The passcode
+/// gates per-app time grants during a window; it is hidden only while a window
+/// is actively blocking (revealing it then would defeat the blocker).
 class _PasscodeSection extends ConsumerWidget {
-  const _PasscodeSection({required this.cutoffMinutes});
-
-  final int cutoffMinutes;
+  const _PasscodeSection();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final view = ref.watch(hardcorePasswordProvider);
-    final cutoff = TimeOfDay(
-      hour: cutoffMinutes ~/ 60,
-      minute: cutoffMinutes % 60,
-    );
 
-    return Column(
-      children: [
-        SectionCard(
-          child: view.when(
-            loading: () => const SizedBox(
-              height: 96,
-              child: Center(child: CircularProgressIndicator()),
-            ),
-            error: (_, _) => const _CodeHidden(
-              message: 'Your passcode is unavailable right now.',
-            ),
-            data: (v) => (v.viewable && v.password != null)
-                ? _CodeVisible(
-                    code: v.password!,
-                    onRegenerate: () async {
-                      await ref
-                          .read(engineChannelProvider)
-                          .regenerateHardcorePassword();
-                      ref.invalidate(hardcorePasswordProvider);
-                    },
-                  )
-                : _CodeHidden(
-                    message: 'Hidden for now. Your code is only visible before '
-                        '${cutoff.format(context)} each day, so you can\'t look '
-                        'it up once a window has started.',
-                  ),
-          ),
+    return SectionCard(
+      child: view.when(
+        loading: () => const SizedBox(
+          height: 96,
+          child: Center(child: CircularProgressIndicator()),
         ),
-        const SizedBox(height: 12),
-        SettingGroup(
-          rows: [
-            SettingRow(
-              title: 'Visible until',
-              subtitle: 'After this time each day the code is hidden. Moving '
-                  'it later takes effect at your next window.',
-              trailing: _ValuePill(cutoff.format(context)),
-              onTap: () => _pickCutoff(context, ref, cutoff),
-            ),
-          ],
+        error: (_, _) => const _CodeHidden(
+          message: 'Your passcode is unavailable right now.',
         ),
-      ],
+        data: (v) => (v.viewable && v.password != null)
+            ? _CodeVisible(
+                code: v.password!,
+                onRegenerate: () async {
+                  await ref
+                      .read(engineChannelProvider)
+                      .regenerateHardcorePassword();
+                  ref.invalidate(hardcorePasswordProvider);
+                },
+              )
+            : const _CodeHidden(
+                message: 'Hidden while a window is active, so you can\'t look '
+                    'it up once blocking has started.',
+              ),
+      ),
     );
-  }
-
-  Future<void> _pickCutoff(
-    BuildContext context,
-    WidgetRef ref,
-    TimeOfDay initial,
-  ) async {
-    final picked = await showTimePicker(context: context, initialTime: initial);
-    if (picked == null) return;
-    await ref.read(engineChannelProvider).updateConfig(
-          ConfigPatch(
-            passwordViewCutoffMinutes: picked.hour * 60 + picked.minute,
-          ),
-        );
   }
 }
 
@@ -201,35 +161,3 @@ class _CodeHidden extends StatelessWidget {
   }
 }
 
-class _ValuePill extends StatelessWidget {
-  const _ValuePill(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: BedrockColors.surfaceHigh,
-        borderRadius: BorderRadius.circular(BedrockRadii.pill),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            text,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: BedrockColors.onSurface,
-            ),
-          ),
-          const SizedBox(width: 4),
-          const Icon(Icons.chevron_right,
-              size: 18, color: BedrockColors.onSurfaceMuted),
-        ],
-      ),
-    );
-  }
-}

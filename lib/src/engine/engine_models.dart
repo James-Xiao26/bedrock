@@ -90,15 +90,11 @@ class EngineConfig {
   const EngineConfig({
     required this.schedule,
     required this.allowlist,
-    required this.passwordViewCutoffMinutes,
   });
 
   /// ISO day-of-week (1=Mon..7=Sun) -> the window starting that day.
   final Map<int, NightPlan> schedule;
   final Set<String> allowlist;
-
-  /// Minutes since midnight after which the passcode is hidden.
-  final int passwordViewCutoffMinutes;
 
   factory EngineConfig.fromJsonString(String raw) {
     final json = jsonDecode(raw) as Map<String, Object?>;
@@ -111,8 +107,6 @@ class EngineConfig {
       ),
       allowlist:
           (json['allowlist'] as List<Object?>? ?? []).cast<String>().toSet(),
-      passwordViewCutoffMinutes:
-          json['passwordViewCutoffMinutes'] as int? ?? 15 * 60,
     );
   }
 }
@@ -138,20 +132,16 @@ class ConfigPatch {
   const ConfigPatch({
     this.schedule,
     this.allowlist,
-    this.passwordViewCutoffMinutes,
   });
 
   final Map<int, NightPlan>? schedule;
   final Set<String>? allowlist;
-  final int? passwordViewCutoffMinutes;
 
   String toJsonString() => jsonEncode({
         if (schedule != null)
           'schedule':
               schedule!.map((day, plan) => MapEntry('$day', plan.toJson())),
         if (allowlist != null) 'allowlist': allowlist!.toList(),
-        if (passwordViewCutoffMinutes != null)
-          'passwordViewCutoffMinutes': passwordViewCutoffMinutes,
       });
 }
 

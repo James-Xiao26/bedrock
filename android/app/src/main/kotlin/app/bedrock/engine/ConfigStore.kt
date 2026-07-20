@@ -50,8 +50,8 @@ class ConfigStore(context: Context) {
      * resulting (active, pending) pair after persisting both.
      */
     @Synchronized
-    fun update(requested: ConfigPatch, tonightDay: Int): ChangeClassifier.Result {
-        val result = ChangeClassifier.classify(activeConfig(), pendingPatch(), requested, tonightDay)
+    fun update(requested: ConfigPatch): ChangeClassifier.Result {
+        val result = ChangeClassifier.classify(activeConfig(), pendingPatch(), requested)
         persist(result.active, result.pending)
         return result
     }

@@ -13,21 +13,27 @@ class ChangeClassifierTest {
         requested: ConfigPatch,
         active: BedrockConfig = base,
         pending: ConfigPatch = ConfigPatch.EMPTY,
-        tonight: Int = monday,
-    ) = ChangeClassifier.classify(active, pending, requested, tonight)
+    ) = ChangeClassifier.classify(active, pending, requested)
 
-    // --- bedtime ---
+    // --- schedule: always applies immediately, no freeze ---
 
     @Test
-    fun `later bedtime tonight is deferred`() {
-        val requested = patchFor(monday, base.plan(monday).copy(bedMinutes = min("23:30")))
+    fun `any schedule edit for tonight applies now`() {
+        // Every kind of loosening (later bed, earlier wake, disable) lands now.
+        val requested = patchFor(
+            monday,
+            NightPlan(bedMinutes = min("23:30"), wakeMinutes = min("06:00"), enabled = false),
+        )
         val result = classify(requested)
-        assertEquals(min("23:00"), result.active.plan(monday).bedMinutes)
-        assertEquals(min("23:30"), result.pending.schedule!!.getValue(monday).bedMinutes)
+        assertEquals(
+            NightPlan(bedMinutes = min("23:30"), wakeMinutes = min("06:00"), enabled = false),
+            result.active.plan(monday),
+        )
+        assertEquals(null, result.pending.schedule)
     }
 
     @Test
-    fun `earlier bedtime tonight applies now and clears pending`() {
+    fun `a schedule edit clears any stale pending for that day`() {
         val pending = ConfigPatch(schedule = mapOf(monday to base.plan(monday).copy(bedMinutes = min("23:30"))))
         val requested = patchFor(monday, base.plan(monday).copy(bedMinutes = min("22:30")))
         val result = classify(requested, pending = pending)
@@ -36,100 +42,11 @@ class ChangeClassifierTest {
     }
 
     @Test
-    fun `bedtime past midnight is later than one before midnight`() {
-        // 00:30 must count as LATER than 23:00, not earlier.
-        val requested = patchFor(monday, base.plan(monday).copy(bedMinutes = min("00:30")))
-        val result = classify(requested)
-        assertEquals(min("23:00"), result.active.plan(monday).bedMinutes)
-        assertEquals(min("00:30"), result.pending.schedule!!.getValue(monday).bedMinutes)
-    }
-
-    // --- wake ---
-
-    @Test
-    fun `earlier wake tonight is deferred`() {
-        val requested = patchFor(monday, base.plan(monday).copy(wakeMinutes = min("06:00")))
-        val result = classify(requested)
-        assertEquals(min("07:00"), result.active.plan(monday).wakeMinutes)
-        assertEquals(min("06:00"), result.pending.schedule!!.getValue(monday).wakeMinutes)
-    }
-
-    @Test
-    fun `later wake tonight applies now`() {
-        val requested = patchFor(monday, base.plan(monday).copy(wakeMinutes = min("08:00")))
-        val result = classify(requested)
-        assertEquals(min("08:00"), result.active.plan(monday).wakeMinutes)
-        assertEquals(null, result.pending.schedule)
-    }
-
-    // --- mixed plan: split per field ---
-
-    @Test
-    fun `mixed tighten and loosen in one plan splits per field`() {
-        // Earlier bed (tighten) + earlier wake (loosen) in a single edit.
-        val requested = patchFor(
-            monday,
-            NightPlan(bedMinutes = min("22:00"), wakeMinutes = min("06:00")),
-        )
-        val result = classify(requested)
-        // Tightened half applies now:
-        assertEquals(min("22:00"), result.active.plan(monday).bedMinutes)
-        assertEquals(min("07:00"), result.active.plan(monday).wakeMinutes)
-        // Full requested plan lands tomorrow:
-        assertEquals(
-            NightPlan(bedMinutes = min("22:00"), wakeMinutes = min("06:00")),
-            result.pending.schedule!!.getValue(monday),
-        )
-    }
-
-    @Test
-    fun `disabling tonight is deferred, enabling applies now`() {
-        val disable = patchFor(monday, base.plan(monday).copy(enabled = false))
-        val disabled = classify(disable)
-        assertEquals(true, disabled.active.plan(monday).enabled)
-        assertEquals(false, disabled.pending.schedule!!.getValue(monday).enabled)
-
-        val activeDisabled = base.copy(
-            schedule = base.schedule + (monday to base.plan(monday).copy(enabled = false)),
-        )
-        val enable = patchFor(monday, activeDisabled.plan(monday).copy(enabled = true))
-        val enabled = classify(enable, active = activeDisabled)
-        assertEquals(true, enabled.active.plan(monday).enabled)
-        assertEquals(null, enabled.pending.schedule)
-    }
-
-    // --- other weekdays ---
-
-    @Test
-    fun `changes to another weekday apply immediately even if loosening`() {
+    fun `changes to another weekday apply immediately`() {
         val requested = patchFor(tuesday, NightPlan(min("01:00"), min("05:00"), enabled = false))
-        val result = classify(requested, tonight = monday)
+        val result = classify(requested)
         assertEquals(NightPlan(min("01:00"), min("05:00"), enabled = false), result.active.plan(tuesday))
         assertEquals(null, result.pending.schedule)
-    }
-
-    // --- passcode visibility cutoff ---
-
-    @Test
-    fun `earlier code cutoff applies now, later cutoff is deferred`() {
-        // base default cutoff is 15:00.
-        val earlier = classify(ConfigPatch(passwordViewCutoffMinutes = min("13:00")))
-        assertEquals(min("13:00"), earlier.active.passwordViewCutoffMinutes)
-        assertEquals(null, earlier.pending.passwordViewCutoffMinutes)
-
-        val later = classify(ConfigPatch(passwordViewCutoffMinutes = min("18:00")))
-        assertEquals(min("15:00"), later.active.passwordViewCutoffMinutes)
-        assertEquals(min("18:00"), later.pending.passwordViewCutoffMinutes)
-    }
-
-    @Test
-    fun `re-requesting the active cutoff cancels a pending change`() {
-        val result = classify(
-            ConfigPatch(passwordViewCutoffMinutes = min("15:00")),
-            pending = ConfigPatch(passwordViewCutoffMinutes = min("18:00")),
-        )
-        assertEquals(min("15:00"), result.active.passwordViewCutoffMinutes)
-        assertEquals(null, result.pending.passwordViewCutoffMinutes)
     }
 
     // --- allowlist ---
@@ -159,15 +76,13 @@ class ChangeClassifierTest {
     // --- pending merge round trip ---
 
     @Test
-    fun `pending patch applied at the boundary yields the requested config`() {
-        val requested = ConfigPatch(
-            schedule = mapOf(monday to NightPlan(min("23:45"), min("06:30"))),
-            passwordViewCutoffMinutes = min("18:00"),
-        )
-        val result = classify(requested)
-        val merged = result.pending.appliedTo(result.active)
-        assertEquals(NightPlan(min("23:45"), min("06:30")), merged.plan(monday))
-        assertEquals(min("18:00"), merged.passwordViewCutoffMinutes)
+    fun `pending allowlist applied at the boundary yields the requested config`() {
+        val active = base.copy(allowlist = setOf("a"))
+        val requested = ConfigPatch(allowlist = setOf("a", "b"))
+        val result = classify(requested, active = active)
+        // The addition waits; folding pending in yields the full set.
+        assertEquals(setOf("a"), result.active.allowlist)
+        assertEquals(setOf("a", "b"), result.pending.appliedTo(result.active).allowlist)
     }
 
     // --- helpers ---

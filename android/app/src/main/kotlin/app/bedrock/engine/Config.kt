@@ -29,12 +29,6 @@ data class BedrockConfig(
     val schedule: Map<Int, NightPlan> = defaultSchedule,
     /** Packages the user allows through during a window (system apps are always allowed). */
     val allowlist: Set<String> = emptySet(),
-    /**
-     * Minutes since midnight after which the passcode can no longer be viewed
-     * (or regenerated) in the app. Default 15:00 - late enough to save the code
-     * during the day, early enough that you cannot simply look it up at night.
-     */
-    val passwordViewCutoffMinutes: Int = 15 * 60,
 ) {
     fun toJson(): String = json.encodeToString(serializer(), this)
 
@@ -57,7 +51,6 @@ data class BedrockConfig(
 data class ConfigPatch(
     val schedule: Map<Int, NightPlan>? = null,
     val allowlist: Set<String>? = null,
-    val passwordViewCutoffMinutes: Int? = null,
 ) {
     fun isEmpty(): Boolean = this == ConfigPatch()
 
@@ -67,7 +60,6 @@ data class ConfigPatch(
     fun appliedTo(base: BedrockConfig): BedrockConfig = base.copy(
         schedule = schedule?.let { base.schedule + it } ?: base.schedule,
         allowlist = allowlist ?: base.allowlist,
-        passwordViewCutoffMinutes = passwordViewCutoffMinutes ?: base.passwordViewCutoffMinutes,
     )
 
     /** Overlay [other] on top of this patch (later fields win). */
@@ -78,7 +70,6 @@ data class ConfigPatch(
             else -> schedule + other.schedule
         },
         allowlist = other.allowlist ?: allowlist,
-        passwordViewCutoffMinutes = other.passwordViewCutoffMinutes ?: passwordViewCutoffMinutes,
     )
 
     companion object {
