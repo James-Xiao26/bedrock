@@ -16,8 +16,8 @@ const _dayNames = {
   7: 'Sunday',
 };
 
-/// Per-weekday bed/wake editor. Every edit goes straight to the engine; the
-/// native freeze rules decide whether it applies tonight or tomorrow.
+/// Per-weekday downtime-window editor. Every edit goes straight to the engine;
+/// the native freeze rules decide whether it applies now or at the next window.
 class ScheduleScreen extends ConsumerWidget {
   const ScheduleScreen({super.key});
 
@@ -54,8 +54,8 @@ class _ScheduleList extends ConsumerWidget {
       context: context,
       initialTime: TimeOfDay(hour: initial ~/ 60, minute: initial % 60),
       helpText: editingBed
-          ? 'Bedtime for ${_dayNames[day]} night'
-          : 'Wake time for ${_dayNames[day]} night',
+          ? 'Downtime start for ${_dayNames[day]}'
+          : 'Downtime end for ${_dayNames[day]}',
     );
     if (picked == null) return;
     final minutes = picked.hour * 60 + picked.minute;
@@ -121,8 +121,8 @@ class _PendingBanner extends StatelessWidget {
           SizedBox(width: 14),
           Expanded(
             child: Text(
-              'Some changes loosen tonight\'s lockdown and will apply '
-              'tomorrow morning.',
+              'Some changes loosen the current window and will apply at '
+              'your next window.',
               style: TextStyle(
                 fontSize: 14,
                 height: 1.35,
@@ -181,7 +181,7 @@ class _DayCard extends StatelessWidget {
               Expanded(
                 child: _TimeChip(
                   icon: Icons.bedtime_outlined,
-                  label: 'Bed',
+                  label: 'Start',
                   value: _fmt(context, plan.bedMinutes),
                   onTap: plan.enabled ? onEditBed : null,
                 ),
@@ -190,7 +190,7 @@ class _DayCard extends StatelessWidget {
               Expanded(
                 child: _TimeChip(
                   icon: Icons.wb_twilight_outlined,
-                  label: 'Wake',
+                  label: 'End',
                   value: _fmt(context, plan.wakeMinutes),
                   onTap: plan.enabled ? onEditWake : null,
                 ),

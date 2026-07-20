@@ -5,10 +5,8 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
@@ -21,25 +19,15 @@ import app.bedrock.blocking.BlockingController
 import app.bedrock.blocking.UsageEventsPoller
 
 /**
- * Keeps the enforcement engine alive from wind-down until wake time.
- * While blocking is active it also:
- * - lands the user on the night clock whenever the screen turns on;
- * - runs the UsageEvents poller when the accessibility service is off.
- * The alarms scheduled via setAlarmClock() are independent resurrection
- * points if the system still kills us.
+ * Keeps the enforcement engine alive while a block window is active. It runs
+ * the UsageEvents poller when the accessibility service is off. The alarms
+ * scheduled via setAlarmClock() are independent resurrection points if the
+ * system still kills us. Unlike a takeover, it does not touch the home screen
+ * - only opening a blocked app triggers the blocker.
  */
 class LockdownForegroundService : Service() {
 
     private var poller: UsageEventsPoller? = null
-    private var screenReceiverRegistered = false
-
-    private val screenReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            if (BlockingController.isActive(context)) {
-                BlockingController.bounceToNightClock(context, "screen-on")
-            }
-        }
-    }
 
     override fun onCreate() {
         super.onCreate()
@@ -69,10 +57,6 @@ class LockdownForegroundService : Service() {
     override fun onDestroy() {
         poller?.stop()
         poller = null
-        if (screenReceiverRegistered) {
-            unregisterReceiver(screenReceiver)
-            screenReceiverRegistered = false
-        }
         super.onDestroy()
     }
 
@@ -81,21 +65,6 @@ class LockdownForegroundService : Service() {
     /** Called on every (re)start; the engine pokes us at each transition. */
     private fun syncMonitors() {
         val blocking = BlockingController.isActive(this)
-
-        if (blocking && !screenReceiverRegistered) {
-            registerReceiver(
-                screenReceiver,
-                IntentFilter().apply {
-                    addAction(Intent.ACTION_SCREEN_ON)
-                    addAction(Intent.ACTION_USER_PRESENT)
-                },
-            )
-            screenReceiverRegistered = true
-        } else if (!blocking && screenReceiverRegistered) {
-            unregisterReceiver(screenReceiver)
-            screenReceiverRegistered = false
-        }
-
         if (blocking && !accessibilityEnabled()) {
             (poller ?: UsageEventsPoller(this).also { poller = it }).start()
         } else {
@@ -122,8 +91,8 @@ class LockdownForegroundService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle("Bedrock is guarding your night")
-            .setContentText("Your bedtime lockdown is active.")
+            .setContentTitle("Downtime is on")
+            .setContentText("Bedrock is blocking apps during your window.")
             .setOngoing(true)
             .setContentIntent(tapIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -133,10 +102,10 @@ class LockdownForegroundService : Service() {
     private fun createChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Bedtime session",
+            "Downtime session",
             NotificationManager.IMPORTANCE_LOW,
         ).apply {
-            description = "Shown while a bedtime lockdown session is running."
+            description = "Shown while a block window is running."
         }
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }

@@ -2,9 +2,9 @@
 <resources>
     <string name="app_name">Bedrock</string>
     <string name="accessibility_service_description">
-        During your scheduled bedtime, Bedrock watches which app comes to the
-        front and returns you to the night clock if the app is blocked. It
-        only sees which app is open - never what is on your screen. It does
-        nothing outside your bedtime window.
+        During your scheduled downtime window, Bedrock watches which app comes
+        to the front and blocks it if it is not on your allowed list. It only
+        sees which app is open - never what is on your screen. It does nothing
+        outside your downtime window.
     </string>
 </resources>

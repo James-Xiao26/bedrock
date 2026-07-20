@@ -7,32 +7,34 @@ import kotlinx.serialization.json.Json
  * Canonical engine configuration. Pure Kotlin (no Android deps) so the
  * freeze rules and state machine are exhaustively unit-testable.
  *
- * Times are serialized as "HH:mm" strings; days as ISO weekday numbers
+ * Times are serialized as minutes-since-midnight; days as ISO weekday numbers
  * (1 = Monday .. 7 = Sunday) to keep the JSON stable across locales.
  */
 
-enum class Mode { NORMAL, HARDCORE }
-
 @Serializable
 data class NightPlan(
-    /** Bedtime, minutes since midnight. */
+    /** Window start, minutes since midnight. */
     val bedMinutes: Int,
-    /** Wake time, minutes since midnight. May be earlier than bed (crosses midnight). */
+    /** Window end, minutes since midnight. May be earlier than start (crosses midnight). */
     val wakeMinutes: Int,
     val enabled: Boolean = true,
 )
 
 @Serializable
 data class BedrockConfig(
-    val schemaVersion: Int = 1,
-    /** ISO day-of-week (1=Mon..7=Sun) -> plan for the night STARTING that day. */
+    // ponytail: bumped so old configs shed the removed sleep-takeover keys
+    // (ignoreUnknownKeys drops them silently on the next read).
+    val schemaVersion: Int = 2,
+    /** ISO day-of-week (1=Mon..7=Sun) -> the block window STARTING that day. */
     val schedule: Map<Int, NightPlan> = defaultSchedule,
-    val mode: Mode = Mode.NORMAL,
-    val windDownMinutes: Int = 30,
+    /** Packages the user allows through during a window (system apps are always allowed). */
     val allowlist: Set<String> = emptySet(),
-    val alarmEnabled: Boolean = false,
-    val dndEnabled: Boolean = true,
-    val grayscaleEnabled: Boolean = false,
+    /**
+     * Minutes since midnight after which the passcode can no longer be viewed
+     * (or regenerated) in the app. Default 15:00 - late enough to save the code
+     * during the day, early enough that you cannot simply look it up at night.
+     */
+    val passwordViewCutoffMinutes: Int = 15 * 60,
 ) {
     fun toJson(): String = json.encodeToString(serializer(), this)
 
@@ -49,17 +51,13 @@ data class BedrockConfig(
 /**
  * A sparse, user-initiated change to the config. Every field is optional;
  * null means "not touched". The classifier decides which parts apply now
- * and which wait for morning.
+ * and which wait for the next window.
  */
 @Serializable
 data class ConfigPatch(
     val schedule: Map<Int, NightPlan>? = null,
-    val mode: Mode? = null,
-    val windDownMinutes: Int? = null,
     val allowlist: Set<String>? = null,
-    val alarmEnabled: Boolean? = null,
-    val dndEnabled: Boolean? = null,
-    val grayscaleEnabled: Boolean? = null,
+    val passwordViewCutoffMinutes: Int? = null,
 ) {
     fun isEmpty(): Boolean = this == ConfigPatch()
 
@@ -68,12 +66,8 @@ data class ConfigPatch(
     /** Apply this patch on top of [base], returning the merged config. */
     fun appliedTo(base: BedrockConfig): BedrockConfig = base.copy(
         schedule = schedule?.let { base.schedule + it } ?: base.schedule,
-        mode = mode ?: base.mode,
-        windDownMinutes = windDownMinutes ?: base.windDownMinutes,
         allowlist = allowlist ?: base.allowlist,
-        alarmEnabled = alarmEnabled ?: base.alarmEnabled,
-        dndEnabled = dndEnabled ?: base.dndEnabled,
-        grayscaleEnabled = grayscaleEnabled ?: base.grayscaleEnabled,
+        passwordViewCutoffMinutes = passwordViewCutoffMinutes ?: base.passwordViewCutoffMinutes,
     )
 
     /** Overlay [other] on top of this patch (later fields win). */
@@ -83,12 +77,8 @@ data class ConfigPatch(
             schedule == null -> other.schedule
             else -> schedule + other.schedule
         },
-        mode = other.mode ?: mode,
-        windDownMinutes = other.windDownMinutes ?: windDownMinutes,
         allowlist = other.allowlist ?: allowlist,
-        alarmEnabled = other.alarmEnabled ?: alarmEnabled,
-        dndEnabled = other.dndEnabled ?: dndEnabled,
-        grayscaleEnabled = other.grayscaleEnabled ?: grayscaleEnabled,
+        passwordViewCutoffMinutes = other.passwordViewCutoffMinutes ?: passwordViewCutoffMinutes,
     )
 
     companion object {

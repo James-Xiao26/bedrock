@@ -31,3 +31,29 @@ final configProvider = FutureProvider<ConfigView>((ref) async {
   });
   return ref.watch(engineChannelProvider).getConfig();
 });
+
+/// Local sleep stats; refreshed after every night-end. RecordNight runs in the
+/// same effect batch that fires 'sessionStateChanged', so no separate event is
+/// needed. Screens also re-read on resume, per the convention above.
+final statsProvider = FutureProvider<StatsView>((ref) async {
+  ref.listen(engineEventsProvider, (_, next) {
+    if (next.valueOrNull?.name == 'sessionStateChanged') {
+      ref.invalidateSelf();
+    }
+  });
+  return ref.watch(engineChannelProvider).getStats();
+});
+
+/// The hardcore escape code as the engine will reveal it right now. Visibility
+/// depends on wall-clock time and session state, so screens re-read on resume
+/// and after any config/session change rather than trusting a cached value.
+final hardcorePasswordProvider =
+    FutureProvider<HardcorePasswordView>((ref) async {
+  ref.listen(engineEventsProvider, (_, next) {
+    final name = next.valueOrNull?.name;
+    if (name == 'configChanged' || name == 'sessionStateChanged') {
+      ref.invalidateSelf();
+    }
+  });
+  return ref.watch(engineChannelProvider).getHardcorePassword();
+});

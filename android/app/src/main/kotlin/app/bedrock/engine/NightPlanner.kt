@@ -6,68 +6,61 @@ import java.time.LocalTime
 import java.time.ZoneId
 
 /**
- * Pure calendar math: which night governs "now", and at what instants does
- * it wind down, lock, and wake. A plan belongs to the evening of its weekday;
- * bedtimes before noon are treated as past-midnight bedtimes of the previous
- * evening (bed 00:30 on the night keyed Friday happens Saturday 00:30).
+ * Pure calendar math: which block window governs "now", and at what instants
+ * it opens and closes. A window belongs to the day of its weekday; starts
+ * before noon are treated as past-midnight starts of the previous day
+ * (start 00:30 on the window keyed Friday happens Saturday 00:30).
  */
 object NightPlanner {
 
-    data class PlannedNight(
-        /** Date of the evening the night starts on (the plan's weekday). */
-        val nightKey: LocalDate,
+    data class PlannedWindow(
+        /** Date of the day the window starts on (the plan's weekday). */
+        val windowKey: LocalDate,
         val day: Int,
         val enabled: Boolean,
-        val windDownEpochMs: Long,
-        val bedEpochMs: Long,
-        val wakeEpochMs: Long,
+        val openEpochMs: Long,
+        val closeEpochMs: Long,
     ) {
-        fun toContext(config: BedrockConfig): NightContext = NightContext(
-            nightKey = nightKey.toString(),
-            bedEpochMs = bedEpochMs,
-            wakeEpochMs = wakeEpochMs,
-            alarmEnabled = config.alarmEnabled,
-            dndEnabled = config.dndEnabled,
-            mode = config.mode,
+        fun toContext(): WindowContext = WindowContext(
+            windowKey = windowKey.toString(),
+            openEpochMs = openEpochMs,
+            closeEpochMs = closeEpochMs,
         )
     }
 
     /**
-     * The night whose wake time is still ahead of [nowMs]: the in-progress
-     * night if one is running, otherwise the next upcoming one. Returns the
-     * first ENABLED night; disabled nights are skipped entirely.
+     * The window whose close time is still ahead of [nowMs]: the in-progress
+     * window if one is running, otherwise the next upcoming one. Returns the
+     * first ENABLED window; disabled ones are skipped entirely.
      */
-    fun nextNight(nowMs: Long, zone: ZoneId, config: BedrockConfig): PlannedNight? {
+    fun nextNight(nowMs: Long, zone: ZoneId, config: BedrockConfig): PlannedWindow? {
         val today = Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()
         for (offset in -1L..7L) {
-            val evening = today.plusDays(offset)
-            val night = plan(evening, zone, config) ?: continue
-            if (night.wakeEpochMs > nowMs && night.enabled) return night
+            val day = today.plusDays(offset)
+            val window = plan(day, zone, config) ?: continue
+            if (window.closeEpochMs > nowMs && window.enabled) return window
         }
         return null
     }
 
-    /** The concrete instants for the night starting on [evening], if scheduled. */
-    fun plan(evening: LocalDate, zone: ZoneId, config: BedrockConfig): PlannedNight? {
-        val plan = config.schedule[evening.dayOfWeek.value] ?: return null
+    /** The concrete instants for the window starting on [day], if scheduled. */
+    fun plan(day: LocalDate, zone: ZoneId, config: BedrockConfig): PlannedWindow? {
+        val plan = config.schedule[day.dayOfWeek.value] ?: return null
 
-        val bedDate = if (plan.bedMinutes < NOON_MINUTES) evening.plusDays(1) else evening
-        val bed = bedDate.atTime(LocalTime.ofSecondOfDay(plan.bedMinutes * 60L)).atZone(zone)
+        val openDate = if (plan.bedMinutes < NOON_MINUTES) day.plusDays(1) else day
+        val open = openDate.atTime(LocalTime.ofSecondOfDay(plan.bedMinutes * 60L)).atZone(zone)
 
-        var wake = bed.toLocalDate()
+        var close = open.toLocalDate()
             .atTime(LocalTime.ofSecondOfDay(plan.wakeMinutes * 60L))
             .atZone(zone)
-        if (!wake.isAfter(bed)) wake = wake.plusDays(1)
+        if (!close.isAfter(open)) close = close.plusDays(1)
 
-        val windDown = bed.minusMinutes(config.windDownMinutes.toLong())
-
-        return PlannedNight(
-            nightKey = evening,
-            day = evening.dayOfWeek.value,
+        return PlannedWindow(
+            windowKey = day,
+            day = day.dayOfWeek.value,
             enabled = plan.enabled,
-            windDownEpochMs = windDown.toInstant().toEpochMilli(),
-            bedEpochMs = bed.toInstant().toEpochMilli(),
-            wakeEpochMs = wake.toInstant().toEpochMilli(),
+            openEpochMs = open.toInstant().toEpochMilli(),
+            closeEpochMs = close.toInstant().toEpochMilli(),
         )
     }
 

@@ -35,6 +35,28 @@ class EngineChannel {
     return ConfigView.fromWire(wire!);
   }
 
+  /// Aggregated local sleep stats (streak, totals, recent nights).
+  Future<StatsView> getStats() async {
+    final wire = await _method.invokeMethod<Map<Object?, Object?>>('getStats');
+    return StatsView.fromWire(wire!);
+  }
+
+  /// The hardcore escape code, if the engine will currently reveal it.
+  /// Hidden (password == null) past the daily cutoff or during a locked night.
+  Future<HardcorePasswordView> getHardcorePassword() async {
+    final wire = await _method
+        .invokeMethod<Map<Object?, Object?>>('getHardcorePassword');
+    return HardcorePasswordView.fromWire(wire!);
+  }
+
+  /// Roll a fresh escape code. No-op (viewable == false) when the code is
+  /// currently hidden - you cannot generate a code you're not allowed to see.
+  Future<HardcorePasswordView> regenerateHardcorePassword() async {
+    final wire = await _method
+        .invokeMethod<Map<Object?, Object?>>('regenerateHardcorePassword');
+    return HardcorePasswordView.fromWire(wire!);
+  }
+
   /// Debug builds only: run a compressed fake night.
   Future<void> startDemoSession({
     int windDownSeconds = 15,
@@ -44,10 +66,6 @@ class EngineChannel {
         'windDownSeconds': windDownSeconds,
         'sleepSeconds': sleepSeconds,
       });
-
-  /// Debug shortcut: bring up the native night clock directly.
-  Future<void> showNightClock({String wakeLabel = '--:--'}) =>
-      _method.invokeMethod('showNightClock', {'wakeLabel': wakeLabel});
 
   Stream<EngineEvent> events() =>
       _events.receiveBroadcastStream().map(EngineEvent.fromWire);

@@ -13,14 +13,8 @@
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions"/>
-    <!-- Wind-down dim overlay and night-clock bounce-back exemption. -->
+    <!-- Launch the per-app blocker from the background when a blocked app opens. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
-    <!-- Auto-DND during the bedtime window (optional; user-granted). -->
-    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY"/>
-    <!-- True grayscale wind-down; grantable only via adb (power users). -->
-    <uses-permission
-        android:name="android.permission.WRITE_SECURE_SETTINGS"
-        tools:ignore="ProtectedPermissions"/>
 
     <!-- Package visibility (Android 11+): the allowlist must resolve the
          default launcher/dialer, and the picker lists launchable apps. -->
@@ -65,19 +59,10 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".ui.NightClockActivity"
+            android:name=".ui.BlockerActivity"
             android:exported="false"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true"
             android:excludeFromRecents="true"
             android:launchMode="singleInstance"
-            android:theme="@android:style/Theme.Material.NoActionBar"/>
-
-        <activity
-            android:name=".ui.EscapeFlowActivity"
-            android:exported="false"
-            android:showWhenLocked="true"
-            android:excludeFromRecents="true"
             android:theme="@android:style/Theme.Material.NoActionBar"/>
 
         <service
@@ -86,7 +71,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Keeps the user's bedtime lockdown session (app blocking and wake alarm) running overnight."/>
+                android:value="Keeps the app-blocking session running during the user's scheduled downtime window."/>
         </service>
 
         <service

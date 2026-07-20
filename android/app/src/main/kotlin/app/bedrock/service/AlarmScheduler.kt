@@ -31,6 +31,9 @@ class AlarmScheduler(private val context: Context) {
         for (action in ACTIONS) cancel(action)
     }
 
+    /** Post a single exact alarm (e.g. the snooze re-ring). */
+    fun scheduleOne(action: String, epochMs: Long) = schedule(action, epochMs)
+
     private fun schedule(action: String, epochMs: Long) {
         val showApp = PendingIntent.getActivity(
             context,
@@ -57,12 +60,10 @@ class AlarmScheduler(private val context: Context) {
         )
 
     companion object {
-        const val ACTION_WINDDOWN = "app.bedrock.alarm.WINDDOWN"
-        const val ACTION_BEDTIME = "app.bedrock.alarm.BEDTIME"
-        const val ACTION_WAKE = "app.bedrock.alarm.WAKE"
-        const val ACTION_WARN_15 = "app.bedrock.alarm.WARN_15"
-        const val ACTION_WARN_1 = "app.bedrock.alarm.WARN_1"
+        const val ACTION_WINDOW_OPEN = "app.bedrock.alarm.WINDOW_OPEN"
+        const val ACTION_WINDOW_CLOSE = "app.bedrock.alarm.WINDOW_CLOSE"
+        const val ACTION_GRANT_EXPIRY = "app.bedrock.alarm.GRANT_EXPIRY"
         private val ACTIONS =
-            listOf(ACTION_WINDDOWN, ACTION_BEDTIME, ACTION_WAKE, ACTION_WARN_15, ACTION_WARN_1)
+            listOf(ACTION_WINDOW_OPEN, ACTION_WINDOW_CLOSE, ACTION_GRANT_EXPIRY)
     }
 }

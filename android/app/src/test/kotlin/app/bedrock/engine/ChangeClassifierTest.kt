@@ -7,7 +7,7 @@ class ChangeClassifierTest {
 
     private val monday = 1
     private val tuesday = 2
-    private val base = BedrockConfig() // 23:00-07:00 every day, normal mode, 30 min wind-down
+    private val base = BedrockConfig() // 23:00-07:00 every day
 
     private fun classify(
         requested: ConfigPatch,
@@ -108,40 +108,28 @@ class ChangeClassifierTest {
         assertEquals(null, result.pending.schedule)
     }
 
-    // --- mode ---
+    // --- passcode visibility cutoff ---
 
     @Test
-    fun `entering hardcore applies now, leaving hardcore waits for morning`() {
-        val enter = classify(ConfigPatch(mode = Mode.HARDCORE))
-        assertEquals(Mode.HARDCORE, enter.active.mode)
-        assertEquals(null, enter.pending.mode)
+    fun `earlier code cutoff applies now, later cutoff is deferred`() {
+        // base default cutoff is 15:00.
+        val earlier = classify(ConfigPatch(passwordViewCutoffMinutes = min("13:00")))
+        assertEquals(min("13:00"), earlier.active.passwordViewCutoffMinutes)
+        assertEquals(null, earlier.pending.passwordViewCutoffMinutes)
 
-        val hardcore = base.copy(mode = Mode.HARDCORE)
-        val leave = classify(ConfigPatch(mode = Mode.NORMAL), active = hardcore)
-        assertEquals(Mode.HARDCORE, leave.active.mode)
-        assertEquals(Mode.NORMAL, leave.pending.mode)
+        val later = classify(ConfigPatch(passwordViewCutoffMinutes = min("18:00")))
+        assertEquals(min("15:00"), later.active.passwordViewCutoffMinutes)
+        assertEquals(min("18:00"), later.pending.passwordViewCutoffMinutes)
     }
 
     @Test
-    fun `re-requesting the active mode cancels a pending change`() {
-        val hardcore = base.copy(mode = Mode.HARDCORE)
-        val pending = ConfigPatch(mode = Mode.NORMAL)
-        val result = classify(ConfigPatch(mode = Mode.HARDCORE), active = hardcore, pending = pending)
-        assertEquals(Mode.HARDCORE, result.active.mode)
-        assertEquals(null, result.pending.mode)
-    }
-
-    // --- wind-down ---
-
-    @Test
-    fun `longer wind-down applies now, shorter is deferred`() {
-        val longer = classify(ConfigPatch(windDownMinutes = 45))
-        assertEquals(45, longer.active.windDownMinutes)
-        assertEquals(null, longer.pending.windDownMinutes)
-
-        val shorter = classify(ConfigPatch(windDownMinutes = 10))
-        assertEquals(30, shorter.active.windDownMinutes)
-        assertEquals(10, shorter.pending.windDownMinutes)
+    fun `re-requesting the active cutoff cancels a pending change`() {
+        val result = classify(
+            ConfigPatch(passwordViewCutoffMinutes = min("15:00")),
+            pending = ConfigPatch(passwordViewCutoffMinutes = min("18:00")),
+        )
+        assertEquals(min("15:00"), result.active.passwordViewCutoffMinutes)
+        assertEquals(null, result.pending.passwordViewCutoffMinutes)
     }
 
     // --- allowlist ---
@@ -168,43 +156,18 @@ class ChangeClassifierTest {
         assertEquals(null, result.pending.allowlist)
     }
 
-    // --- dnd / neutral fields ---
-
-    @Test
-    fun `dnd off is deferred, dnd on applies now`() {
-        val off = classify(ConfigPatch(dndEnabled = false))
-        assertEquals(true, off.active.dndEnabled)
-        assertEquals(false, off.pending.dndEnabled)
-
-        val activeOff = base.copy(dndEnabled = false)
-        val on = classify(ConfigPatch(dndEnabled = true), active = activeOff)
-        assertEquals(true, on.active.dndEnabled)
-        assertEquals(null, on.pending.dndEnabled)
-    }
-
-    @Test
-    fun `alarm and grayscale toggles are neutral and apply now`() {
-        val result = classify(ConfigPatch(alarmEnabled = true, grayscaleEnabled = true))
-        assertEquals(true, result.active.alarmEnabled)
-        assertEquals(true, result.active.grayscaleEnabled)
-        assertEquals(ConfigPatch.EMPTY, result.pending)
-    }
-
     // --- pending merge round trip ---
 
     @Test
-    fun `pending patch applied at morning yields the requested config`() {
+    fun `pending patch applied at the boundary yields the requested config`() {
         val requested = ConfigPatch(
             schedule = mapOf(monday to NightPlan(min("23:45"), min("06:30"))),
-            mode = Mode.NORMAL,
-            windDownMinutes = 15,
+            passwordViewCutoffMinutes = min("18:00"),
         )
-        val hardcore = base.copy(mode = Mode.HARDCORE)
-        val result = classify(requested, active = hardcore)
+        val result = classify(requested)
         val merged = result.pending.appliedTo(result.active)
         assertEquals(NightPlan(min("23:45"), min("06:30")), merged.plan(monday))
-        assertEquals(Mode.NORMAL, merged.mode)
-        assertEquals(15, merged.windDownMinutes)
+        assertEquals(min("18:00"), merged.passwordViewCutoffMinutes)
     }
 
     // --- helpers ---

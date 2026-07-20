@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../engine/engine_channel.dart';
 import '../../engine/engine_models.dart';
 import '../../engine/engine_providers.dart';
 import '../../theme/app_theme.dart';
@@ -31,80 +30,18 @@ class SettingsScreen extends ConsumerWidget {
         if (config == null)
           const Center(child: CircularProgressIndicator())
         else ...[
-          const SectionLabel('Lockdown'),
-          SettingGroup(
-            rows: [
-              SettingRow(
-                title: 'Hardcore mode',
-                subtitle: 'The only way out of a locked night is the \$1 '
-                    'emergency bypass. Turning this off takes effect '
-                    'tomorrow morning.',
-                trailing: Switch(
-                  value: config.active.mode == Mode.hardcore,
-                  onChanged: (v) => engine.updateConfig(
-                    ConfigPatch(mode: v ? Mode.hardcore : Mode.normal),
-                  ),
-                ),
-              ),
-              SettingRow(
-                title: 'Wind-down',
-                subtitle: 'A gentle warning before lockdown begins.',
-                trailing: _ValuePill('${config.active.windDownMinutes} min'),
-                onTap: () => _pickWindDown(context, engine, config.active),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          const SectionLabel('During the night'),
-          SettingGroup(
-            rows: [
-              SettingRow(
-                title: 'Do Not Disturb',
-                subtitle: 'Silence notifications while you sleep.',
-                trailing: Switch(
-                  value: config.active.dndEnabled,
-                  onChanged: (v) =>
-                      engine.updateConfig(ConfigPatch(dndEnabled: v)),
-                ),
-              ),
-              SettingRow(
-                title: 'Grayscale',
-                subtitle: 'Drain the colour from the screen at bedtime.',
-                trailing: Switch(
-                  value: config.active.grayscaleEnabled,
-                  onChanged: (v) =>
-                      engine.updateConfig(ConfigPatch(grayscaleEnabled: v)),
-                ),
-              ),
-              SettingRow(
-                title: 'Wake-up alarm',
-                subtitle: 'Ring at wake time; snoozing keeps the lock on.',
-                trailing: Switch(
-                  value: config.active.alarmEnabled,
-                  onChanged: (v) =>
-                      engine.updateConfig(ConfigPatch(alarmEnabled: v)),
-                ),
-              ),
-            ],
+          const SectionLabel('Passcode'),
+          _PasscodeSection(
+            cutoffMinutes: config.active.passwordViewCutoffMinutes,
           ),
           if (kDebugMode) ...[
             const SizedBox(height: 24),
             const SectionLabel('Debug'),
             SectionCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  OutlinedButton(
-                    onPressed: () => engine.startDemoSession(
-                        windDownSeconds: 10, sleepSeconds: 30),
-                    child: const Text('Run demo night (10s + 30s)'),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton(
-                    onPressed: () => engine.showNightClock(),
-                    child: const Text('Show night clock'),
-                  ),
-                ],
+              child: OutlinedButton(
+                onPressed: () => engine.startDemoSession(
+                    windDownSeconds: 5, sleepSeconds: 30),
+                child: const Text('Run demo window (35s)'),
               ),
             ),
           ],
@@ -112,61 +49,155 @@ class SettingsScreen extends ConsumerWidget {
       ],
     );
   }
+}
 
-  Future<void> _pickWindDown(
-    BuildContext context,
-    EngineChannel engine,
-    EngineConfig config,
-  ) async {
-    const options = [0, 5, 15, 30, 45, 60];
-    final picked = await showModalBottomSheet<int>(
-      context: context,
-      backgroundColor: BedrockColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(BedrockRadii.hero)),
-      ),
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(24, 20, 24, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Wind-down length',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: BedrockColors.onSurface,
+/// Shows the current passcode while it is allowed to be seen, lets the user
+/// roll a new one, and edits the daily visibility cutoff. The passcode gates
+/// per-app time grants during a window.
+class _PasscodeSection extends ConsumerWidget {
+  const _PasscodeSection({required this.cutoffMinutes});
+
+  final int cutoffMinutes;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final view = ref.watch(hardcorePasswordProvider);
+    final cutoff = TimeOfDay(
+      hour: cutoffMinutes ~/ 60,
+      minute: cutoffMinutes % 60,
+    );
+
+    return Column(
+      children: [
+        SectionCard(
+          child: view.when(
+            loading: () => const SizedBox(
+              height: 96,
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (_, _) => const _CodeHidden(
+              message: 'Your passcode is unavailable right now.',
+            ),
+            data: (v) => (v.viewable && v.password != null)
+                ? _CodeVisible(
+                    code: v.password!,
+                    onRegenerate: () async {
+                      await ref
+                          .read(engineChannelProvider)
+                          .regenerateHardcorePassword();
+                      ref.invalidate(hardcorePasswordProvider);
+                    },
+                  )
+                : _CodeHidden(
+                    message: 'Hidden for now. Your code is only visible before '
+                        '${cutoff.format(context)} each day, so you can\'t look '
+                        'it up once a window has started.',
                   ),
-                ),
-              ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SettingGroup(
+          rows: [
+            SettingRow(
+              title: 'Visible until',
+              subtitle: 'After this time each day the code is hidden. Moving '
+                  'it later takes effect at your next window.',
+              trailing: _ValuePill(cutoff.format(context)),
+              onTap: () => _pickCutoff(context, ref, cutoff),
             ),
-            RadioGroup<int>(
-              groupValue: config.windDownMinutes,
-              onChanged: (v) => Navigator.pop(context, v),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (final minutes in options)
-                    RadioListTile<int>(
-                      value: minutes,
-                      activeColor: BedrockColors.accent,
-                      title: Text(minutes == 0 ? 'Off' : '$minutes minutes'),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
           ],
         ),
-      ),
+      ],
     );
-    if (picked != null && picked != config.windDownMinutes) {
-      await engine.updateConfig(ConfigPatch(windDownMinutes: picked));
-    }
+  }
+
+  Future<void> _pickCutoff(
+    BuildContext context,
+    WidgetRef ref,
+    TimeOfDay initial,
+  ) async {
+    final picked = await showTimePicker(context: context, initialTime: initial);
+    if (picked == null) return;
+    await ref.read(engineChannelProvider).updateConfig(
+          ConfigPatch(
+            passwordViewCutoffMinutes: picked.hour * 60 + picked.minute,
+          ),
+        );
+  }
+}
+
+class _CodeVisible extends StatelessWidget {
+  const _CodeVisible({required this.code, required this.onRegenerate});
+
+  final String code;
+  final Future<void> Function() onRegenerate;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(
+          child: Text(
+            code,
+            style: const TextStyle(
+              fontSize: 44,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 14,
+              color: BedrockColors.onSurface,
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          'Save this where you can reach it - write it down or hand it to '
+          'someone. It stays the same until you reset it.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 13,
+            height: 1.35,
+            color: BedrockColors.onSurfaceMuted,
+          ),
+        ),
+        const SizedBox(height: 16),
+        OutlinedButton(
+          onPressed: onRegenerate,
+          child: const Text('Generate a new code'),
+        ),
+      ],
+    );
+  }
+}
+
+class _CodeHidden extends StatelessWidget {
+  const _CodeHidden({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Center(
+          child: Icon(
+            Icons.lock_outline,
+            size: 40,
+            color: BedrockColors.onSurfaceMuted,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 13,
+            height: 1.35,
+            color: BedrockColors.onSurfaceMuted,
+          ),
+        ),
+      ],
+    );
   }
 }
 

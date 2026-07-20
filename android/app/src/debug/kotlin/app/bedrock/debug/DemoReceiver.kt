@@ -4,46 +4,39 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import app.bedrock.engine.BedrockEngine
+import app.bedrock.engine.GrantKind
 import app.bedrock.engine.SessionEvent
-import app.bedrock.service.AlarmScheduler
-import app.bedrock.service.receivers.AlarmReceiver
 
 /**
  * Debug-build-only adb hook for E2E scripts (this source set never ships):
  *
  *   adb shell am broadcast -n app.bedrock/.debug.DemoReceiver \
- *     -a app.bedrock.debug.DEMO --ei winddown 10 --ei sleep 30
+ *     -a app.bedrock.debug.DEMO --ei winddown 5 --ei sleep 60
  *   adb shell am broadcast -n app.bedrock/.debug.DemoReceiver \
- *     -a app.bedrock.debug.EVENT --es event WakeDue|EscapeCompleted|...
+ *     -a app.bedrock.debug.EVENT --es event WindowClose|Violation
+ *   adb shell am broadcast -n app.bedrock/.debug.DemoReceiver \
+ *     -a app.bedrock.debug.GRANT --es pkg com.example --es kind FIVE_MIN
  */
 class DemoReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val engine = BedrockEngine.get(context)
         when (intent.action) {
             "app.bedrock.debug.DEMO" -> engine.startDemoSession(
-                windDownSeconds = intent.getIntExtra("winddown", 10),
-                sleepSeconds = intent.getIntExtra("sleep", 30),
+                windDownSeconds = intent.getIntExtra("winddown", 5),
+                sleepSeconds = intent.getIntExtra("sleep", 60),
             )
             "app.bedrock.debug.EVENT" -> when (intent.getStringExtra("event")) {
-                "WakeDue" -> engine.dispatch(SessionEvent.WakeDue)
-                "EscapeCompleted" -> engine.dispatch(SessionEvent.EscapeCompleted)
-                "BypassPurchased" -> engine.dispatch(SessionEvent.BypassPurchased)
-                "ViolationDetected" -> engine.dispatch(SessionEvent.ViolationDetected)
-                "AlarmDismissed" -> engine.dispatch(SessionEvent.AlarmDismissed)
-                "AlarmSnoozed" -> engine.dispatch(SessionEvent.AlarmSnoozed)
+                "WindowClose" -> engine.dispatch(SessionEvent.WindowCloseDue)
+                "Violation" -> engine.dispatch(SessionEvent.ViolationDetected)
+            }
+            "app.bedrock.debug.GRANT" -> {
+                val pkg = intent.getStringExtra("pkg") ?: return
+                val kind = runCatching {
+                    GrantKind.valueOf(intent.getStringExtra("kind") ?: "FIVE_MIN")
+                }.getOrDefault(GrantKind.FIVE_MIN)
+                engine.grantApp(pkg, kind)
             }
             "app.bedrock.debug.EVALUATE" -> engine.evaluate()
-            // Exercise the real AlarmReceiver -> notification path without
-            // waiting out a genuine T-15/T-1 alarm.
-            "app.bedrock.debug.WARN" -> context.sendBroadcast(
-                Intent(context, AlarmReceiver::class.java).setAction(
-                    if (intent.getIntExtra("minutes", 15) == 1) {
-                        AlarmScheduler.ACTION_WARN_1
-                    } else {
-                        AlarmScheduler.ACTION_WARN_15
-                    },
-                ),
-            )
         }
     }
 }

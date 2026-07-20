@@ -24,7 +24,7 @@ class TonightScreen extends ConsumerWidget {
         _HeroCard(session: session),
         const SizedBox(height: 24),
         if (config != null) ...[
-          const SectionLabel('Tonight'),
+          const SectionLabel('Today'),
           _TonightPlanCard(config: config.active),
           const SizedBox(height: 24),
           const SectionLabel('This week'),
@@ -69,21 +69,13 @@ class _HeroCard extends StatelessWidget {
     final (title, detail, icon) = switch (session) {
       AsyncData(:final value) => (
           switch (value.state) {
-            SessionState.idle => 'Awake',
-            SessionState.winddown => 'Winding down',
-            SessionState.locked => 'Locked for the night',
-            SessionState.escaped => 'Escaped tonight',
-            SessionState.bypassed => 'Bypassed tonight',
-            SessionState.wakeAlarm => 'Time to wake up',
+            SessionState.idle => 'Apps unblocked',
+            SessionState.active => 'Downtime on',
           },
           _heroDetail(context, value),
           switch (value.state) {
             SessionState.idle => Icons.wb_sunny_outlined,
-            SessionState.winddown => Icons.bedtime_outlined,
-            SessionState.locked => Icons.lock_outline,
-            SessionState.escaped => Icons.lock_open_outlined,
-            SessionState.bypassed => Icons.lock_open_outlined,
-            SessionState.wakeAlarm => Icons.alarm,
+            SessionState.active => Icons.lock_outline,
           },
         ),
       AsyncError() => ('Engine unreachable', 'Reopen the app to retry.', Icons.cloud_off),
@@ -140,16 +132,12 @@ class _HeroCard extends StatelessWidget {
     String at(DateTime? t) =>
         t == null ? '' : TimeOfDay.fromDateTime(t).format(context);
     return switch (s.state) {
-      SessionState.idle => s.plannedBedtime == null
-          ? 'No night scheduled.'
-          : 'Bedtime at ${at(s.plannedBedtime)}.',
-      SessionState.winddown => 'Lockdown begins soon. Wrap things up.',
-      SessionState.locked || SessionState.wakeAlarm => s.plannedWake == null
-          ? 'Your phone is a night clock until morning.'
-          : 'Unlocks at ${at(s.plannedWake)}.',
-      SessionState.escaped ||
-      SessionState.bypassed =>
-        'Lockdown is off for the rest of the night.',
+      SessionState.idle => s.windowOpen == null
+          ? 'No window scheduled.'
+          : 'Downtime starts at ${at(s.windowOpen)}.',
+      SessionState.active => s.windowClose == null
+          ? 'Blocked apps stay blocked until your window ends.'
+          : 'Blocked apps unblock at ${at(s.windowClose)}.',
     };
   }
 }
@@ -173,7 +161,7 @@ class _TonightPlanCard extends StatelessWidget {
             SizedBox(width: 14),
             Expanded(
               child: Text(
-                'No lockdown tonight. Edit your schedule to add one.',
+                'No downtime today. Edit your schedule to add one.',
                 style: TextStyle(
                   fontSize: 15,
                   color: BedrockColors.onSurfaceMuted,
@@ -191,7 +179,7 @@ class _TonightPlanCard extends StatelessWidget {
           Expanded(
             child: _TimeStat(
               icon: Icons.bedtime_outlined,
-              label: 'Bedtime',
+              label: 'Starts',
               value: _fmt(context, plan.bedMinutes),
             ),
           ),
@@ -203,7 +191,7 @@ class _TonightPlanCard extends StatelessWidget {
           Expanded(
             child: _TimeStat(
               icon: Icons.wb_twilight_outlined,
-              label: 'Wake',
+              label: 'Ends',
               value: _fmt(context, plan.wakeMinutes),
             ),
           ),

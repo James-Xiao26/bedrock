@@ -8,44 +8,27 @@ import 'dart:convert';
 
 enum SessionState {
   idle,
-  winddown,
-  locked,
-  escaped,
-  bypassed,
-  wakeAlarm;
+  active;
 
   static SessionState fromWire(String value) => switch (value) {
         'IDLE' => SessionState.idle,
-        'WINDDOWN' => SessionState.winddown,
-        'LOCKED' => SessionState.locked,
-        'ESCAPED' => SessionState.escaped,
-        'BYPASSED' => SessionState.bypassed,
-        'WAKE_ALARM' => SessionState.wakeAlarm,
+        'ACTIVE' => SessionState.active,
         _ => throw ArgumentError('Unknown session state: $value'),
       };
-}
-
-enum Mode {
-  normal,
-  hardcore;
-
-  String toWire() => name.toUpperCase();
-
-  static Mode fromWire(String value) => Mode.values.byName(value.toLowerCase());
 }
 
 class SessionSnapshot {
   const SessionSnapshot({
     required this.state,
     required this.blocking,
-    this.plannedBedtime,
-    this.plannedWake,
+    this.windowOpen,
+    this.windowClose,
   });
 
   final SessionState state;
   final bool blocking;
-  final DateTime? plannedBedtime;
-  final DateTime? plannedWake;
+  final DateTime? windowOpen;
+  final DateTime? windowClose;
 
   factory SessionSnapshot.fromWire(Map<Object?, Object?> wire) {
     DateTime? epoch(Object? v) => v == null
@@ -54,8 +37,8 @@ class SessionSnapshot {
     return SessionSnapshot(
       state: SessionState.fromWire(wire['state'] as String),
       blocking: wire['blocking'] as bool? ?? false,
-      plannedBedtime: epoch(wire['plannedBedtime']),
-      plannedWake: epoch(wire['plannedWake']),
+      windowOpen: epoch(wire['windowOpen']),
+      windowClose: epoch(wire['windowClose']),
     );
   }
 }
@@ -67,7 +50,8 @@ class NightPlan {
     this.enabled = true,
   });
 
-  /// Minutes since midnight; bedtimes before noon mean "past midnight".
+  /// Minutes since midnight. [bedMinutes] is the window start, [wakeMinutes]
+  /// the end; a start before noon means "past midnight".
   final int bedMinutes;
   final int wakeMinutes;
   final bool enabled;
@@ -105,22 +89,16 @@ class NightPlan {
 class EngineConfig {
   const EngineConfig({
     required this.schedule,
-    required this.mode,
-    required this.windDownMinutes,
     required this.allowlist,
-    required this.alarmEnabled,
-    required this.dndEnabled,
-    required this.grayscaleEnabled,
+    required this.passwordViewCutoffMinutes,
   });
 
-  /// ISO day-of-week (1=Mon..7=Sun) -> plan for the night starting that day.
+  /// ISO day-of-week (1=Mon..7=Sun) -> the window starting that day.
   final Map<int, NightPlan> schedule;
-  final Mode mode;
-  final int windDownMinutes;
   final Set<String> allowlist;
-  final bool alarmEnabled;
-  final bool dndEnabled;
-  final bool grayscaleEnabled;
+
+  /// Minutes since midnight after which the passcode is hidden.
+  final int passwordViewCutoffMinutes;
 
   factory EngineConfig.fromJsonString(String raw) {
     final json = jsonDecode(raw) as Map<String, Object?>;
@@ -131,48 +109,49 @@ class EngineConfig {
           NightPlan.fromJson(plan as Map<String, Object?>),
         ),
       ),
-      mode: Mode.fromWire(json['mode'] as String? ?? 'NORMAL'),
-      windDownMinutes: json['windDownMinutes'] as int? ?? 30,
       allowlist:
           (json['allowlist'] as List<Object?>? ?? []).cast<String>().toSet(),
-      alarmEnabled: json['alarmEnabled'] as bool? ?? false,
-      dndEnabled: json['dndEnabled'] as bool? ?? true,
-      grayscaleEnabled: json['grayscaleEnabled'] as bool? ?? false,
+      passwordViewCutoffMinutes:
+          json['passwordViewCutoffMinutes'] as int? ?? 15 * 60,
     );
   }
 }
 
+/// The passcode as the engine chooses to expose it: [password] is null
+/// whenever the code is hidden (past the cutoff, or during an active window).
+class HardcorePasswordView {
+  const HardcorePasswordView({required this.viewable, this.password});
+
+  final bool viewable;
+  final String? password;
+
+  factory HardcorePasswordView.fromWire(Map<Object?, Object?> wire) =>
+      HardcorePasswordView(
+        viewable: wire['viewable'] as bool? ?? false,
+        password: wire['password'] as String?,
+      );
+}
+
 /// Sparse change request; only non-null fields are sent. The native
-/// ChangeClassifier decides what applies now versus tomorrow morning.
+/// ChangeClassifier decides what applies now versus at the next window.
 class ConfigPatch {
   const ConfigPatch({
     this.schedule,
-    this.mode,
-    this.windDownMinutes,
     this.allowlist,
-    this.alarmEnabled,
-    this.dndEnabled,
-    this.grayscaleEnabled,
+    this.passwordViewCutoffMinutes,
   });
 
   final Map<int, NightPlan>? schedule;
-  final Mode? mode;
-  final int? windDownMinutes;
   final Set<String>? allowlist;
-  final bool? alarmEnabled;
-  final bool? dndEnabled;
-  final bool? grayscaleEnabled;
+  final int? passwordViewCutoffMinutes;
 
   String toJsonString() => jsonEncode({
         if (schedule != null)
           'schedule':
               schedule!.map((day, plan) => MapEntry('$day', plan.toJson())),
-        if (mode != null) 'mode': mode!.toWire(),
-        if (windDownMinutes != null) 'windDownMinutes': windDownMinutes,
         if (allowlist != null) 'allowlist': allowlist!.toList(),
-        if (alarmEnabled != null) 'alarmEnabled': alarmEnabled,
-        if (dndEnabled != null) 'dndEnabled': dndEnabled,
-        if (grayscaleEnabled != null) 'grayscaleEnabled': grayscaleEnabled,
+        if (passwordViewCutoffMinutes != null)
+          'passwordViewCutoffMinutes': passwordViewCutoffMinutes,
       });
 }
 
@@ -182,7 +161,7 @@ class ConfigView {
   final EngineConfig active;
 
   /// Raw pending patch JSON; non-empty (not '{}') means loosening changes
-  /// are waiting for morning.
+  /// are waiting for the next window.
   final String pendingRaw;
 
   bool get hasPendingChanges => pendingRaw.trim() != '{}';
@@ -190,6 +169,55 @@ class ConfigView {
   factory ConfigView.fromWire(Map<Object?, Object?> wire) => ConfigView(
         active: EngineConfig.fromJsonString(wire['active'] as String),
         pendingRaw: wire['pending'] as String,
+      );
+}
+
+/// How a recorded window ended. Mirrors WindowOutcome in the Kotlin engine.
+enum WindowOutcome {
+  clean,
+  unlocked,
+  violated;
+
+  static WindowOutcome fromWire(String value) =>
+      WindowOutcome.values.byName(value.toLowerCase());
+}
+
+/// One recorded window, for the recent-windows strip.
+class RecentWindow {
+  const RecentWindow({required this.windowKey, required this.outcome});
+
+  /// ISO yyyy-MM-dd of the day the window started on.
+  final String windowKey;
+  final WindowOutcome outcome;
+
+  factory RecentWindow.fromWire(Map<Object?, Object?> wire) => RecentWindow(
+        windowKey: wire['windowKey'] as String,
+        outcome: WindowOutcome.fromWire(wire['outcome'] as String),
+      );
+}
+
+/// Read-only projection of local usage stats. The engine does the counting.
+class StatsView {
+  const StatsView({
+    required this.currentStreak,
+    required this.windowsKept,
+    required this.totalWindows,
+    required this.recent,
+  });
+
+  /// Consecutive clean windows ending at the most recent recorded window.
+  final int currentStreak;
+  final int windowsKept;
+  final int totalWindows;
+  final List<RecentWindow> recent;
+
+  factory StatsView.fromWire(Map<Object?, Object?> wire) => StatsView(
+        currentStreak: (wire['currentStreak'] as num?)?.toInt() ?? 0,
+        windowsKept: (wire['windowsKept'] as num?)?.toInt() ?? 0,
+        totalWindows: (wire['totalWindows'] as num?)?.toInt() ?? 0,
+        recent: (wire['recent'] as List<Object?>? ?? const [])
+            .map((e) => RecentWindow.fromWire(e as Map<Object?, Object?>))
+            .toList(),
       );
 }
 

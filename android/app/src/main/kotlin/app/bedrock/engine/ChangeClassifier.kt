@@ -1,23 +1,21 @@
 package app.bedrock.engine
 
 /**
- * Implements the settings freeze: changes that make TONIGHT easier only take
- * effect tomorrow morning; tightening applies immediately.
+ * Implements the settings freeze: changes that make the CURRENT window easier
+ * only take effect at the next window; tightening applies immediately.
  *
- * Pure function of (active config, pending patch, requested patch, tonight's
- * weekday). Returns the new active config and the new pending patch. The
- * caller (ConfigStore) persists both and merges pending at the morning
+ * Pure function of (active config, pending patch, requested patch, current
+ * window's weekday). Returns the new active config and the new pending patch.
+ * The caller (ConfigStore) persists both and merges pending at the window
  * boundary.
  *
  * Rules per field, judged against the currently effective value:
- * - Loosen (deferred to morning): later bedtime, earlier wake, disabling the
- *   night, hardcore -> normal, smaller wind-down, allowlist ADDITIONS,
- *   turning DND off.
+ * - Loosen (deferred): later start, earlier end, disabling the window, later
+ *   passcode cutoff, allowlist ADDITIONS.
  * - Tighten (applied now, clearing any contradicted pending value): earlier
- *   bedtime, later wake, enabling, normal -> hardcore, larger wind-down,
- *   allowlist REMOVALS, turning DND on.
- * - Neutral (applied now): alarm toggle/sound, grayscale toggle, and any
- *   schedule change for a weekday other than tonight.
+ *   start, later end, enabling, earlier passcode cutoff, allowlist REMOVALS.
+ * - Neutral (applied now): any schedule change for a weekday other than the
+ *   current window's.
  * - Setting a field back to its active value cancels the pending change.
  */
 object ChangeClassifier {
@@ -38,7 +36,7 @@ object ChangeClassifier {
             val pendingDays = (pending.schedule ?: emptyMap()).toMutableMap()
             for ((day, requestedPlan) in days) {
                 if (day != tonightDay) {
-                    // Other weekdays never loosen tonight; apply directly.
+                    // Other weekdays never loosen the current window; apply directly.
                     activeDays[day] = requestedPlan
                     pendingDays.remove(day)
                     continue
@@ -64,30 +62,21 @@ object ChangeClassifier {
             newPending = newPending.copy(schedule = pendingDays.ifEmpty { null })
         }
 
-        requested.mode?.let { mode ->
-            if (mode == active.mode) {
-                newPending = newPending.copy(mode = null)
-            } else if (mode == Mode.HARDCORE) {
-                newActive = newActive.copy(mode = mode)
-                newPending = newPending.copy(mode = null)
+        requested.passwordViewCutoffMinutes?.let { cutoff ->
+            // A LATER cutoff means more chances to peek at the code before the
+            // window, so it loosens (waits); an earlier cutoff tightens.
+            if (cutoff == active.passwordViewCutoffMinutes) {
+                newPending = newPending.copy(passwordViewCutoffMinutes = null)
+            } else if (cutoff < active.passwordViewCutoffMinutes) {
+                newActive = newActive.copy(passwordViewCutoffMinutes = cutoff)
+                newPending = newPending.copy(passwordViewCutoffMinutes = null)
             } else {
-                newPending = newPending.copy(mode = mode)
-            }
-        }
-
-        requested.windDownMinutes?.let { minutes ->
-            if (minutes == active.windDownMinutes) {
-                newPending = newPending.copy(windDownMinutes = null)
-            } else if (minutes > active.windDownMinutes) {
-                newActive = newActive.copy(windDownMinutes = minutes)
-                newPending = newPending.copy(windDownMinutes = null)
-            } else {
-                newPending = newPending.copy(windDownMinutes = minutes)
+                newPending = newPending.copy(passwordViewCutoffMinutes = cutoff)
             }
         }
 
         requested.allowlist?.let { requestedSet ->
-            // Removals tighten (apply now); additions loosen (wait for morning).
+            // Removals tighten (apply now); additions loosen (wait).
             val tightened = active.allowlist intersect requestedSet
             if (tightened != active.allowlist) {
                 newActive = newActive.copy(allowlist = tightened)
@@ -99,26 +88,11 @@ object ChangeClassifier {
             }
         }
 
-        requested.dndEnabled?.let { dnd ->
-            if (dnd == active.dndEnabled) {
-                newPending = newPending.copy(dndEnabled = null)
-            } else if (dnd) {
-                newActive = newActive.copy(dndEnabled = true)
-                newPending = newPending.copy(dndEnabled = null)
-            } else {
-                newPending = newPending.copy(dndEnabled = false)
-            }
-        }
-
-        // Neutral fields: not restrictions, apply immediately.
-        requested.alarmEnabled?.let { newActive = newActive.copy(alarmEnabled = it) }
-        requested.grayscaleEnabled?.let { newActive = newActive.copy(grayscaleEnabled = it) }
-
         return Result(newActive, newPending)
     }
 
     /**
-     * Bedtimes cluster around midnight; a bedtime before noon is treated as
+     * Window starts cluster around midnight; a start before noon is treated as
      * belonging to the NEXT calendar day (00:30 is later than 23:00).
      */
     private fun isEarlierBed(candidate: Int, reference: Int): Boolean =

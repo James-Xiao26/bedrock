@@ -15,6 +15,8 @@ class ConfigStore(context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("bedrock_engine", Context.MODE_PRIVATE)
 
+    private val snapshotJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+
     @Synchronized
     fun activeConfig(): BedrockConfig =
         prefs.getString(KEY_ACTIVE, null)?.let { BedrockConfig.fromJson(it) } ?: BedrockConfig()
@@ -26,7 +28,11 @@ class ConfigStore(context: Context) {
     @Synchronized
     fun snapshot(): Snapshot =
         prefs.getString(KEY_SNAPSHOT, null)
-            ?.let { kotlinx.serialization.json.Json.decodeFromString(Snapshot.serializer(), it) }
+            ?.let {
+                // A stale snapshot from an older schema (e.g. the pre-pivot
+                // night/earlyExit shape) just resets to IDLE - harmless.
+                runCatching { snapshotJson.decodeFromString(Snapshot.serializer(), it) }.getOrNull()
+            }
             ?: Snapshot()
 
     @Synchronized
@@ -50,6 +56,23 @@ class ConfigStore(context: Context) {
         return result
     }
 
+    /**
+     * The current hardcore escape code, generating and persisting one on first
+     * read. Kept out of [BedrockConfig] on purpose: it is a rotating credential,
+     * not a schedule setting, and must never flow through the freeze rules.
+     */
+    @Synchronized
+    fun hardcorePassword(): String =
+        prefs.getString(KEY_PASSWORD, null) ?: rotateHardcorePassword()
+
+    /** Generate, persist, and return a fresh escape code. */
+    @Synchronized
+    fun rotateHardcorePassword(): String {
+        val next = HardcorePassword.generate()
+        prefs.edit().putString(KEY_PASSWORD, next).commit()
+        return next
+    }
+
     /** Morning boundary: fold pending loosenings into the active config. */
     @Synchronized
     fun mergePending(): BedrockConfig {
@@ -70,5 +93,6 @@ class ConfigStore(context: Context) {
         const val KEY_ACTIVE = "config_active"
         const val KEY_PENDING = "config_pending"
         const val KEY_SNAPSHOT = "session_snapshot"
+        const val KEY_PASSWORD = "hardcore_password"
     }
 }

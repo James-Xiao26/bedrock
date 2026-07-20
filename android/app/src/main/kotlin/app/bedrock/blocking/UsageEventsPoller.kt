@@ -52,8 +52,9 @@ class UsageEventsPoller(private val context: Context) {
             }
         }
         latest?.let {
+            BlockingController.setLastForeground(it)
             if (BlockingController.shouldBlock(context, it)) {
-                BlockingController.bounceToNightClock(context, it)
+                BlockingController.bounceToBlocker(context, it)
             }
         }
     }
