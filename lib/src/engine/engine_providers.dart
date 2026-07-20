@@ -32,6 +32,12 @@ final configProvider = FutureProvider<ConfigView>((ref) async {
   return ref.watch(engineChannelProvider).getConfig();
 });
 
+/// Installed launchable apps for the Always Allowed picker. Loaded once - the
+/// set of installed apps rarely changes within a session.
+final installedAppsProvider = FutureProvider<List<InstalledApp>>(
+  (ref) => ref.watch(engineChannelProvider).getInstalledApps(),
+);
+
 /// Local sleep stats; refreshed after every night-end. RecordNight runs in the
 /// same effect batch that fires 'sessionStateChanged', so no separate event is
 /// needed. Screens also re-read on resume, per the convention above.

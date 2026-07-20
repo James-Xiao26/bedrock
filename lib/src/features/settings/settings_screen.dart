@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../engine/engine_providers.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/section_card.dart';
+import 'allowed_apps_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -29,6 +30,23 @@ class SettingsScreen extends ConsumerWidget {
         if (config == null)
           const Center(child: CircularProgressIndicator())
         else ...[
+          const SectionLabel('Downtime'),
+          SettingGroup(
+            rows: [
+              SettingRow(
+                title: 'Always Allowed',
+                subtitle: 'Apps that stay available during downtime.',
+                trailing: const Icon(Icons.chevron_right,
+                    color: BedrockColors.onSurfaceMuted, size: 20),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const AllowedAppsScreen(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
           const SectionLabel('Passcode'),
           const _PasscodeSection(),
           if (kDebugMode) ...[

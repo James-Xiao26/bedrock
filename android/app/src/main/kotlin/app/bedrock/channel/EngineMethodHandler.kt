@@ -2,6 +2,7 @@ package app.bedrock.channel
 
 import android.content.Context
 import app.bedrock.BuildConfig
+import app.bedrock.blocking.InstalledApps
 import app.bedrock.engine.BedrockEngine
 import app.bedrock.engine.ConfigPatch
 import io.flutter.plugin.common.MethodCall
@@ -37,6 +38,8 @@ class EngineMethodHandler(private val context: Context) : MethodChannel.MethodCa
                     ),
                 )
             }
+
+            "getInstalledApps" -> result.success(InstalledApps(context).list())
 
             "getStats" -> result.success(engine.stats.summary().toWire())
 

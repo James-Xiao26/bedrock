@@ -35,6 +35,15 @@ class EngineChannel {
     return ConfigView.fromWire(wire!);
   }
 
+  /// Every launchable user app (label + icon), for the Always Allowed picker.
+  Future<List<InstalledApp>> getInstalledApps() async {
+    final wire =
+        await _method.invokeMethod<List<Object?>>('getInstalledApps');
+    return (wire ?? const [])
+        .map((e) => InstalledApp.fromWire(e as Map<Object?, Object?>))
+        .toList();
+  }
+
   /// Aggregated local sleep stats (streak, totals, recent nights).
   Future<StatsView> getStats() async {
     final wire = await _method.invokeMethod<Map<Object?, Object?>>('getStats');

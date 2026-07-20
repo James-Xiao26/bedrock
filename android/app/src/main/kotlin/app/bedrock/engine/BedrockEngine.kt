@@ -85,10 +85,13 @@ class BedrockEngine private constructor(private val context: Context) {
 
     @Synchronized
     fun updateConfig(requested: ConfigPatch, nowMs: Long = System.currentTimeMillis()): ChangeClassifier.Result {
-        val result = store.update(requested)
+        store.update(requested)
+        // The freeze only bites during an active window; when nothing is
+        // blocking, loosening changes (allowlist additions) apply immediately.
+        if (!store.snapshot().blocking) store.mergePending()
         EngineEventStreamer.emit("configChanged")
         evaluate(nowMs)
-        return result
+        return ChangeClassifier.Result(store.activeConfig(), store.pendingPatch())
     }
 
     /**

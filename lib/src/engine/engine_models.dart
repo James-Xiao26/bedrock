@@ -5,6 +5,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:typed_data';
 
 enum SessionState {
   idle,
@@ -84,6 +85,25 @@ class NightPlan {
 
   @override
   int get hashCode => Object.hash(bedMinutes, wakeMinutes, enabled);
+}
+
+/// One launchable app for the Always Allowed picker.
+class InstalledApp {
+  const InstalledApp({
+    required this.packageName,
+    required this.label,
+    required this.icon,
+  });
+
+  final String packageName;
+  final String label;
+  final Uint8List icon;
+
+  factory InstalledApp.fromWire(Map<Object?, Object?> wire) => InstalledApp(
+        packageName: wire['package'] as String,
+        label: wire['label'] as String,
+        icon: base64Decode(wire['icon'] as String),
+      );
 }
 
 class EngineConfig {
