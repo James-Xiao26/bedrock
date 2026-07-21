@@ -2,37 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-/// A rounded surface card, ScreenZen-style. Use for every grouped block of
-/// content. Pass [padding] to override the default inset.
-class SectionCard extends StatelessWidget {
-  const SectionCard({
-    super.key,
-    required this.child,
-    this.padding = const EdgeInsets.all(20),
-    this.color,
-    this.onTap,
-  });
-
-  final Widget child;
-  final EdgeInsetsGeometry padding;
-  final Color? color;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: color ?? BedrockColors.surface,
-      borderRadius: BorderRadius.circular(BedrockRadii.card),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(padding: padding, child: child),
-      ),
-    );
-  }
-}
-
-/// Small uppercase label that introduces a group of cards.
+/// Small uppercase label that introduces a group of rows.
 class SectionLabel extends StatelessWidget {
   const SectionLabel(this.text, {super.key});
 
@@ -41,22 +11,22 @@ class SectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 12),
+      padding: const EdgeInsets.only(bottom: 14),
       child: Text(
         text.toUpperCase(),
         style: const TextStyle(
           color: BedrockColors.onSurfaceMuted,
           fontSize: 12,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.2,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 1.5,
         ),
       ),
     );
   }
 }
 
-/// A row inside a settings-style card: title, optional subtitle, trailing
-/// control. Rows within one [SectionCard] are separated by hairline dividers.
+/// A row: title, optional subtitle, trailing control. Sits directly on the page
+/// - grouping comes from the bracketing hairlines of [SettingGroup], not a box.
 class SettingRow extends StatelessWidget {
   const SettingRow({
     super.key,
@@ -76,9 +46,8 @@ class SettingRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: const EdgeInsets.symmetric(vertical: 18),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
               child: Column(
@@ -87,8 +56,8 @@ class SettingRow extends StatelessWidget {
                   Text(
                     title,
                     style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w500,
                       color: BedrockColors.onSurface,
                     ),
                   ),
@@ -117,7 +86,9 @@ class SettingRow extends StatelessWidget {
   }
 }
 
-/// Groups [SettingRow]s inside a single card with hairline separators.
+/// Brackets a set of rows with top and bottom hairlines and separates them with
+/// inner dividers. No fill, no rounded corners - the opposite of a card. This is
+/// the app's one grouping primitive.
 class SettingGroup extends StatelessWidget {
   const SettingGroup({super.key, required this.rows});
 
@@ -128,12 +99,15 @@ class SettingGroup extends StatelessWidget {
     final children = <Widget>[];
     for (var i = 0; i < rows.length; i++) {
       children.add(rows[i]);
-      if (i != rows.length - 1) {
-        children.add(const Divider());
-      }
+      if (i != rows.length - 1) children.add(const Divider(height: 1));
     }
-    return SectionCard(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        border: Border(
+          top: BorderSide(color: BedrockColors.hairline),
+          bottom: BorderSide(color: BedrockColors.hairline),
+        ),
+      ),
       child: Column(children: children),
     );
   }

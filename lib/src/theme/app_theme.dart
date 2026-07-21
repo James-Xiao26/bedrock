@@ -1,30 +1,36 @@
 import 'package:flutter/material.dart';
 
-/// Bedrock's visual language: a ScreenZen-style calm dark surface built around
-/// the app's existing indigo. The seed colour is unchanged from the original
-/// theme; only the surrounding surfaces, shapes and controls are restyled to
-/// match ScreenZen's rounded, navy-tinted aesthetic.
+/// Bedrock's visual language: a calm, minimalist dark surface built on a
+/// monotone *cool true-grey* palette (a faint steel tint, no colour). The
+/// single accent is a light neutral; filled controls put dark text on it.
+/// The UI is editorial - big quiet type and hairline-divided lists, not cards.
 abstract final class BedrockColors {
-  /// The original app accent - kept exactly as it was.
-  static const seed = Color(0xFF5C6BC0);
+  /// Seed for the Material scheme - a mid cool grey.
+  static const seed = Color(0xFF6E7378);
 
-  /// Brighter indigo for accents on dark surfaces.
-  static const accent = Color(0xFF8B96E6);
+  /// The one highlight: a light cool neutral. Dark text sits on it.
+  static const accent = Color(0xFFC7CCD1);
 
-  /// Near-black scaffold with a faint indigo tint.
-  static const background = Color(0xFF111019);
+  /// Near-black scaffold with a faint cool tint.
+  static const background = Color(0xFF0E0F12);
 
-  /// Default rounded-card surface.
-  static const surface = Color(0xFF1C1B29);
+  /// Slightly lifted surface, used sparingly (inputs, pressed states).
+  static const surface = Color(0xFF17181B);
 
-  /// Slightly lifted surface for nested / selected elements.
-  static const surfaceHigh = Color(0xFF262538);
+  /// A touch more lift for nested / selected elements.
+  static const surfaceHigh = Color(0xFF212327);
 
-  static const onSurface = Color(0xFFECEBF5);
-  static const onSurfaceMuted = Color(0xFF9B99B4);
+  static const onSurface = Color(0xFFEDEFF2);
+  static const onSurfaceMuted = Color(0xFF8A9099);
 
-  /// Hero-card gradient, indigo shading into a deeper violet.
-  static const heroGradient = [Color(0xFF5C6BC0), Color(0xFF4A3F8C)];
+  /// Text/icon colour that sits on top of [accent] (its dark counterpart).
+  static const onAccent = Color(0xFF1B1D20);
+
+  /// Hairline used to bracket and separate list rows.
+  static const hairline = Color(0xFF26282C);
+
+  /// Cool charcoal gradient, kept for the odd immersive surface.
+  static const heroGradient = [Color(0xFF2A2D31), Color(0xFF1B1D20)];
 }
 
 /// Corner radii used across the app - large and soft, ScreenZen-style.
@@ -78,25 +84,25 @@ ThemeData buildBedrockTheme() {
       ),
     ),
     dividerTheme: const DividerThemeData(
-      color: Color(0xFF2C2B3D),
+      color: BedrockColors.hairline,
       space: 1,
       thickness: 1,
     ),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith(
         (s) => s.contains(WidgetState.selected)
-            ? Colors.white
-            : const Color(0xFF6E6C86),
+            ? BedrockColors.onAccent
+            : const Color(0xFF5F646B),
       ),
       trackColor: WidgetStateProperty.resolveWith(
         (s) => s.contains(WidgetState.selected)
             ? BedrockColors.accent
-            : const Color(0xFF2C2B3D),
+            : const Color(0xFF26282C),
       ),
       trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: const Color(0xFF17161F),
+      backgroundColor: const Color(0xFF131417),
       surfaceTintColor: Colors.transparent,
       indicatorColor: BedrockColors.accent.withValues(alpha: 0.18),
       elevation: 0,
@@ -121,7 +127,7 @@ ThemeData buildBedrockTheme() {
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         backgroundColor: BedrockColors.accent,
-        foregroundColor: Colors.white,
+        foregroundColor: BedrockColors.onAccent,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
         shape: const StadiumBorder(),
@@ -130,7 +136,7 @@ ThemeData buildBedrockTheme() {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: BedrockColors.onSurface,
-        side: const BorderSide(color: Color(0xFF34334A)),
+        side: const BorderSide(color: Color(0xFF33363B)),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         shape: const StadiumBorder(),

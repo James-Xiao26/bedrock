@@ -4,10 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../engine/engine_models.dart';
 import '../../engine/engine_providers.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/section_card.dart';
 
-/// The home dashboard: a gradient hero card summarising tonight's session
-/// status, the upcoming bed/wake window, and a strip of the week's nights.
+/// The home screen. Deliberately not a stack of cards: an ambient glow at the
+/// top, the session state set as large quiet type, and a single slim timeline
+/// for tonight's window. Everything reads as one calm surface, iOS-like.
 class TonightScreen extends ConsumerWidget {
   const TonightScreen({super.key});
 
@@ -15,21 +15,50 @@ class TonightScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionStateProvider);
     final config = ref.watch(configProvider).valueOrNull;
+    final snap = session.valueOrNull;
+    final active = snap?.state == SessionState.active;
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+    final plan = config?.active.schedule[DateTime.now().weekday];
+    final hasWindow = plan != null && plan.enabled;
+
+    return Stack(
       children: [
-        const _Greeting(),
-        const SizedBox(height: 20),
-        _HeroCard(session: session),
-        const SizedBox(height: 24),
-        if (config != null) ...[
-          const SectionLabel('Today'),
-          _TonightPlanCard(config: config.active),
-          const SizedBox(height: 24),
-          const SectionLabel('This week'),
-          _WeekStrip(config: config.active),
-        ],
+        // Ambient glow bleeding from the top edge - warm when downtime is on.
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 420,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(0, -1.1),
+                  radius: 1.1,
+                  colors: [
+                    (active
+                            ? BedrockColors.accent
+                            : BedrockColors.onSurfaceMuted)
+                        .withValues(alpha: active ? 0.16 : 0.06),
+                    BedrockColors.background.withValues(alpha: 0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        ListView(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 40),
+          children: [
+            const _Greeting(),
+            const SizedBox(height: 56),
+            _Status(session: session),
+            if (hasWindow) ...[
+              const SizedBox(height: 64),
+              _Timeline(plan: plan),
+            ],
+          ],
+        ),
       ],
     );
   }
@@ -49,184 +78,184 @@ class _Greeting extends StatelessWidget {
                 ? 'Good afternoon'
                 : 'Good evening';
     return Text(
-      greeting,
+      greeting.toUpperCase(),
       style: const TextStyle(
-        fontSize: 28,
-        fontWeight: FontWeight.w700,
-        color: BedrockColors.onSurface,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 1.5,
+        color: BedrockColors.onSurfaceMuted,
       ),
     );
   }
 }
 
-class _HeroCard extends StatelessWidget {
-  const _HeroCard({required this.session});
+/// The session state as the page's centre of gravity: one big line of type and
+/// a supporting sentence. No container, no gradient card.
+class _Status extends StatelessWidget {
+  const _Status({required this.session});
 
   final AsyncValue<SessionSnapshot> session;
 
   @override
   Widget build(BuildContext context) {
-    final (title, detail, icon) = switch (session) {
+    final (title, detail) = switch (session) {
       AsyncData(:final value) => (
           switch (value.state) {
             SessionState.idle => 'Apps unblocked',
             SessionState.active => 'Downtime on',
           },
-          _heroDetail(context, value),
-          switch (value.state) {
-            SessionState.idle => Icons.wb_sunny_outlined,
-            SessionState.active => Icons.lock_outline,
-          },
+          _detail(context, value),
         ),
-      AsyncError() => ('Engine unreachable', 'Reopen the app to retry.', Icons.cloud_off),
-      _ => ('Contacting engine...', '', Icons.hourglass_empty),
+      AsyncError() => ('Engine unreachable', 'Reopen the app to retry.'),
+      _ => ('One moment', ''),
     };
 
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: BedrockColors.heroGradient,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 44,
+            height: 1.05,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.5,
+            color: BedrockColors.onSurface,
+          ),
         ),
-        borderRadius: BorderRadius.circular(BedrockRadii.hero),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: Colors.white, size: 26),
-          ),
-          const SizedBox(height: 20),
+        if (detail.isNotEmpty) ...[
+          const SizedBox(height: 14),
           Text(
-            title,
+            detail,
             style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
+              fontSize: 17,
+              height: 1.4,
+              color: BedrockColors.onSurfaceMuted,
             ),
           ),
-          if (detail.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              detail,
-              style: TextStyle(
-                fontSize: 15,
-                height: 1.4,
-                color: Colors.white.withValues(alpha: 0.85),
-              ),
-            ),
-          ],
         ],
-      ),
+      ],
     );
   }
 
-  String _heroDetail(BuildContext context, SessionSnapshot s) {
+  String _detail(BuildContext context, SessionSnapshot s) {
     String at(DateTime? t) =>
         t == null ? '' : TimeOfDay.fromDateTime(t).format(context);
     return switch (s.state) {
       SessionState.idle => s.windowOpen == null
-          ? 'No window scheduled.'
+          ? 'No downtime scheduled tonight.'
           : 'Downtime starts at ${at(s.windowOpen)}.',
       SessionState.active => s.windowClose == null
           ? 'Blocked apps stay blocked until your window ends.'
-          : 'Blocked apps unblock at ${at(s.windowClose)}.',
+          : 'Everything unblocks at ${at(s.windowClose)}.',
     };
   }
 }
 
-class _TonightPlanCard extends StatelessWidget {
-  const _TonightPlanCard({required this.config});
+/// Tonight's window as a slim horizontal timeline: start on the left, end on
+/// the right, a hairline track between with a soft filled span.
+class _Timeline extends StatelessWidget {
+  const _Timeline({required this.plan});
 
-  final EngineConfig config;
-
-  @override
-  Widget build(BuildContext context) {
-    // The night that starts today is keyed by today's ISO weekday.
-    final plan = config.schedule[DateTime.now().weekday];
-
-    if (plan == null || !plan.enabled) {
-      return const SectionCard(
-        child: Row(
-          children: [
-            Icon(Icons.do_not_disturb_on_outlined,
-                color: BedrockColors.onSurfaceMuted),
-            SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                'No downtime today. Edit your schedule to add one.',
-                style: TextStyle(
-                  fontSize: 15,
-                  color: BedrockColors.onSurfaceMuted,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return SectionCard(
-      child: Row(
-        children: [
-          Expanded(
-            child: _TimeStat(
-              icon: Icons.bedtime_outlined,
-              label: 'Starts',
-              value: _fmt(context, plan.bedMinutes),
-            ),
-          ),
-          Container(
-            width: 1,
-            height: 44,
-            color: const Color(0xFF2C2B3D),
-          ),
-          Expanded(
-            child: _TimeStat(
-              icon: Icons.wb_twilight_outlined,
-              label: 'Ends',
-              value: _fmt(context, plan.wakeMinutes),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TimeStat extends StatelessWidget {
-  const _TimeStat({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
+  final NightPlan plan;
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: BedrockColors.accent, size: 22),
-        const SizedBox(height: 10),
+        const Text(
+          'TONIGHT',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.5,
+            color: BedrockColors.onSurfaceMuted,
+          ),
+        ),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            _Endpoint(
+              label: 'Bed',
+              time: _fmt(context, plan.bedMinutes),
+              align: CrossAxisAlignment.start,
+            ),
+            const Expanded(child: _Track()),
+            _Endpoint(
+              label: 'Wake',
+              time: _fmt(context, plan.wakeMinutes),
+              align: CrossAxisAlignment.end,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _Track extends StatelessWidget {
+  const _Track();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      // Sit against the time row, above the small labels.
+      padding: const EdgeInsets.only(bottom: 20, left: 14, right: 14),
+      child: Row(
+        children: [
+          _dot(BedrockColors.accent),
+          Expanded(
+            child: Container(
+              height: 2,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    BedrockColors.accent.withValues(alpha: 0.6),
+                    BedrockColors.onSurfaceMuted.withValues(alpha: 0.25),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          _dot(BedrockColors.onSurfaceMuted.withValues(alpha: 0.7)),
+        ],
+      ),
+    );
+  }
+
+  Widget _dot(Color c) => Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(color: c, shape: BoxShape.circle),
+      );
+}
+
+class _Endpoint extends StatelessWidget {
+  const _Endpoint({
+    required this.label,
+    required this.time,
+    required this.align,
+  });
+
+  final String label;
+  final String time;
+  final CrossAxisAlignment align;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: align,
+      children: [
         Text(
-          value,
+          time,
           style: const TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w700,
             color: BedrockColors.onSurface,
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 4),
         Text(
           label,
           style: const TextStyle(
@@ -235,81 +264,6 @@ class _TimeStat extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _WeekStrip extends StatelessWidget {
-  const _WeekStrip({required this.config});
-
-  final EngineConfig config;
-
-  static const _initials = {
-    1: 'M',
-    2: 'T',
-    3: 'W',
-    4: 'T',
-    5: 'F',
-    6: 'S',
-    7: 'S',
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final today = DateTime.now().weekday;
-    return SectionCard(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          for (final day in _initials.keys)
-            _DayDot(
-              label: _initials[day]!,
-              enabled: config.schedule[day]?.enabled ?? false,
-              isToday: day == today,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DayDot extends StatelessWidget {
-  const _DayDot({
-    required this.label,
-    required this.enabled,
-    required this.isToday,
-  });
-
-  final String label;
-  final bool enabled;
-  final bool isToday;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: enabled ? BedrockColors.accent : Colors.transparent,
-        shape: BoxShape.circle,
-        border: isToday && !enabled
-            ? Border.all(color: BedrockColors.accent, width: 1.5)
-            : null,
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-          color: enabled
-              ? Colors.white
-              : (isToday
-                  ? BedrockColors.accent
-                  : BedrockColors.onSurfaceMuted),
-        ),
-      ),
     );
   }
 }

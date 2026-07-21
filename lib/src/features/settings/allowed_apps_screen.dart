@@ -100,8 +100,13 @@ class _AppCard extends StatelessWidget {
       rows.add(_AppRow(app: apps[i], action: action, onTap: () => onTap(apps[i])));
       if (i != apps.length - 1) rows.add(const Divider(indent: 52));
     }
-    return SectionCard(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        border: Border(
+          top: BorderSide(color: BedrockColors.hairline),
+          bottom: BorderSide(color: BedrockColors.hairline),
+        ),
+      ),
       child: Column(children: rows),
     );
   }

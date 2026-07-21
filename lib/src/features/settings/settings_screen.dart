@@ -46,13 +46,14 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 36),
           const SectionLabel('Passcode'),
           const _PasscodeSection(),
           if (kDebugMode) ...[
-            const SizedBox(height: 24),
+            const SizedBox(height: 36),
             const SectionLabel('Debug'),
-            SectionCard(
+            SizedBox(
+              width: double.infinity,
               child: OutlinedButton(
                 onPressed: () => engine.startDemoSession(
                     windDownSeconds: 5, sleepSeconds: 30),
@@ -76,30 +77,28 @@ class _PasscodeSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final view = ref.watch(hardcorePasswordProvider);
 
-    return SectionCard(
-      child: view.when(
-        loading: () => const SizedBox(
-          height: 96,
-          child: Center(child: CircularProgressIndicator()),
-        ),
-        error: (_, _) => const _CodeHidden(
-          message: 'Your passcode is unavailable right now.',
-        ),
-        data: (v) => (v.viewable && v.password != null)
-            ? _CodeVisible(
-                code: v.password!,
-                onRegenerate: () async {
-                  await ref
-                      .read(engineChannelProvider)
-                      .regenerateHardcorePassword();
-                  ref.invalidate(hardcorePasswordProvider);
-                },
-              )
-            : const _CodeHidden(
-                message: 'Hidden while a window is active, so you can\'t look '
-                    'it up once blocking has started.',
-              ),
+    return view.when(
+      loading: () => const SizedBox(
+        height: 96,
+        child: Center(child: CircularProgressIndicator()),
       ),
+      error: (_, _) => const _CodeHidden(
+        message: 'Your passcode is unavailable right now.',
+      ),
+      data: (v) => (v.viewable && v.password != null)
+          ? _CodeVisible(
+              code: v.password!,
+              onRegenerate: () async {
+                await ref
+                    .read(engineChannelProvider)
+                    .regenerateHardcorePassword();
+                ref.invalidate(hardcorePasswordProvider);
+              },
+            )
+          : const _CodeHidden(
+              message: 'Hidden while a window is active, so you can\'t look '
+                  'it up once blocking has started.',
+            ),
     );
   }
 }

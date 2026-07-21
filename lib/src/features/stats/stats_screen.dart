@@ -7,8 +7,9 @@ import '../../theme/app_theme.dart';
 import '../../widgets/section_card.dart';
 
 /// Sleep stats: current streak, lifetime totals, and a strip of recent nights
-/// coloured by how each one ended. Re-reads on resume since the event stream
-/// may have been dead while backgrounded.
+/// coloured by how each one ended. Editorial layout - big type, hairlines, no
+/// cards. Re-reads on resume since the event stream may have died while
+/// backgrounded.
 class StatsScreen extends ConsumerStatefulWidget {
   const StatsScreen({super.key});
 
@@ -38,31 +39,62 @@ class _StatsScreenState extends ConsumerState<StatsScreen>
   @override
   Widget build(BuildContext context) {
     final stats = ref.watch(statsProvider);
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+    return Stack(
       children: [
-        const Text(
-          'Your history',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w700,
-            color: BedrockColors.onSurface,
-          ),
-        ),
-        const SizedBox(height: 20),
-        switch (stats) {
-          AsyncData(:final value) => _StatsBody(stats: value),
-          AsyncError() => const SectionCard(
-              child: Text(
-                'Stats unavailable. Reopen the app to retry.',
-                style: TextStyle(color: BedrockColors.onSurfaceMuted),
+        const _TopGlow(),
+        ListView(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 40),
+          children: [
+            const Text(
+              'YOUR HISTORY',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1.5,
+                color: BedrockColors.onSurfaceMuted,
               ),
             ),
-          _ => const SectionCard(
-              child: Center(child: CircularProgressIndicator()),
-            ),
-        },
+            const SizedBox(height: 24),
+            switch (stats) {
+              AsyncData(:final value) => _StatsBody(stats: value),
+              AsyncError() => const _Empty(
+                  'Stats unavailable. Reopen the app to retry.'),
+              _ => const Padding(
+                  padding: EdgeInsets.only(top: 40),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+            },
+          ],
+        ),
       ],
+    );
+  }
+}
+
+class _TopGlow extends StatelessWidget {
+  const _TopGlow();
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 420,
+      child: IgnorePointer(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              center: const Alignment(0, -1.1),
+              radius: 1.1,
+              colors: [
+                BedrockColors.accent.withValues(alpha: 0.10),
+                BedrockColors.background.withValues(alpha: 0),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -75,50 +107,51 @@ class _StatsBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (stats.totalWindows == 0) {
-      return const SectionCard(
-        child: Row(
+      return const _Empty(
+          'No windows recorded yet. Your first downtime shows up here.');
+    }
+
+    final s = stats.currentStreak;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$s',
+          style: const TextStyle(
+            fontSize: 72,
+            height: 1.0,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -1,
+            color: BedrockColors.onSurface,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          s == 1 ? 'clean window in a row' : 'clean windows in a row',
+          style: const TextStyle(
+            fontSize: 17,
+            color: BedrockColors.onSurfaceMuted,
+          ),
+        ),
+        const SizedBox(height: 56),
+        const SectionLabel('Totals'),
+        Row(
           children: [
-            Icon(Icons.insights_outlined, color: BedrockColors.onSurfaceMuted),
-            SizedBox(width: 14),
             Expanded(
-              child: Text(
-                'No windows recorded yet. Your first downtime shows up here.',
-                style: TextStyle(fontSize: 15, color: BedrockColors.onSurfaceMuted),
+              child: _NumberStat(
+                value: '${stats.windowsKept}',
+                label: 'Clean windows',
+              ),
+            ),
+            Expanded(
+              child: _NumberStat(
+                value: '${stats.totalWindows}',
+                label: 'Total windows',
               ),
             ),
           ],
         ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _StreakCard(streak: stats.currentStreak),
-        const SizedBox(height: 24),
-        const SectionLabel('Totals'),
-        SectionCard(
-          child: Row(
-            children: [
-              Expanded(
-                child: _NumberStat(
-                  icon: Icons.check_circle_outline,
-                  label: 'Clean windows',
-                  value: '${stats.windowsKept}',
-                ),
-              ),
-              Container(width: 1, height: 44, color: const Color(0xFF2C2B3D)),
-              Expanded(
-                child: _NumberStat(
-                  icon: Icons.nightlight_outlined,
-                  label: 'Total windows',
-                  value: '${stats.totalWindows}',
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 56),
         const SectionLabel('Recent windows'),
         _RecentStrip(recent: stats.recent),
       ],
@@ -126,89 +159,30 @@ class _StatsBody extends StatelessWidget {
   }
 }
 
-class _StreakCard extends StatelessWidget {
-  const _StreakCard({required this.streak});
-
-  final int streak;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: BedrockColors.heroGradient,
-        ),
-        borderRadius: BorderRadius.circular(BedrockRadii.hero),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.local_fire_department,
-                color: Colors.white, size: 26),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            '$streak',
-            style: const TextStyle(
-              fontSize: 48,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              height: 1.0,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            streak == 1 ? 'clean window in a row' : 'clean windows in a row',
-            style: TextStyle(
-              fontSize: 15,
-              color: Colors.white.withValues(alpha: 0.85),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _NumberStat extends StatelessWidget {
-  const _NumberStat({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
+  const _NumberStat({required this.value, required this.label});
 
-  final IconData icon;
-  final String label;
   final String value;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: BedrockColors.accent, size: 22),
-        const SizedBox(height: 10),
         Text(
           value,
           style: const TextStyle(
-            fontSize: 22,
+            fontSize: 34,
             fontWeight: FontWeight.w700,
             color: BedrockColors.onSurface,
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 4),
         Text(
           label,
           style: const TextStyle(
-            fontSize: 13,
+            fontSize: 14,
             color: BedrockColors.onSurfaceMuted,
           ),
         ),
@@ -237,18 +211,15 @@ class _RecentStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SectionCard(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          for (final window in recent)
-            _OutcomeDot(
-              label: _initial(window.windowKey),
-              color: _color(window.outcome),
-            ),
-        ],
-      ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        for (final window in recent)
+          _OutcomeDot(
+            label: _initial(window.windowKey),
+            color: _color(window.outcome),
+          ),
+      ],
     );
   }
 }
@@ -262,16 +233,37 @@ class _OutcomeDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 36,
-      height: 36,
+      width: 34,
+      height: 34,
       decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       alignment: Alignment.center,
       child: Text(
         label,
         style: const TextStyle(
           fontSize: 14,
-          fontWeight: FontWeight.w700,
-          color: Colors.white,
+          fontWeight: FontWeight.w600,
+          color: BedrockColors.onAccent,
+        ),
+      ),
+    );
+  }
+}
+
+class _Empty extends StatelessWidget {
+  const _Empty(this.message);
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 24),
+      child: Text(
+        message,
+        style: const TextStyle(
+          fontSize: 17,
+          height: 1.4,
+          color: BedrockColors.onSurfaceMuted,
         ),
       ),
     );

@@ -144,12 +144,13 @@ class _ScheduleListState extends ConsumerState<_ScheduleList> {
           const _PendingBanner(),
           const SizedBox(height: 16),
         ],
-        SectionCard(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-          child: SettingRow(
-            title: 'Scheduled',
-            trailing: Switch(value: scheduled, onChanged: _setScheduled),
-          ),
+        SettingGroup(
+          rows: [
+            SettingRow(
+              title: 'Scheduled',
+              trailing: Switch(value: scheduled, onChanged: _setScheduled),
+            ),
+          ],
         ),
         const SizedBox(height: 8),
         const _Caption('Scheduled turns on downtime for the time period you '
@@ -185,13 +186,14 @@ class _ScheduleListState extends ConsumerState<_ScheduleList> {
               ],
             )
           else if (ref0 != null)
-            SectionCard(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-              child: _WindowRow(
-                label: 'Time',
-                value: _fmtRange(context, ref0),
-                onTap: () => _editWindow(_dayNames.keys, ref0),
-              ),
+            SettingGroup(
+              rows: [
+                _WindowRow(
+                  label: 'Time',
+                  value: _fmtRange(context, ref0),
+                  onTap: () => _editWindow(_dayNames.keys, ref0),
+                ),
+              ],
             ),
         ],
         const SizedBox(height: 8),
@@ -288,26 +290,23 @@ class _PendingBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SectionCard(
-      color: BedrockColors.accent.withValues(alpha: 0.14),
-      padding: const EdgeInsets.all(16),
-      child: const Row(
-        children: [
-          Icon(Icons.schedule, color: BedrockColors.accent, size: 22),
-          SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              'Some changes loosen the current window and will apply at '
-              'your next window.',
-              style: TextStyle(
-                fontSize: 14,
-                height: 1.35,
-                color: BedrockColors.onSurface,
-              ),
+    return const Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.schedule, color: BedrockColors.accent, size: 20),
+        SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            'Some changes loosen the current window and will apply at '
+            'your next window.',
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.4,
+              color: BedrockColors.onSurfaceMuted,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
