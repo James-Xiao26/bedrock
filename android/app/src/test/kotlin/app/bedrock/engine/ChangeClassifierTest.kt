@@ -22,11 +22,11 @@ class ChangeClassifierTest {
         // Every kind of loosening (later bed, earlier wake, disable) lands now.
         val requested = patchFor(
             monday,
-            NightPlan(bedMinutes = min("23:30"), wakeMinutes = min("06:00"), enabled = false),
+            NightPlan(bedtimeMinutes = min("23:30"), wakeMinutes = min("06:00"), enabled = false),
         )
         val result = classify(requested)
         assertEquals(
-            NightPlan(bedMinutes = min("23:30"), wakeMinutes = min("06:00"), enabled = false),
+            NightPlan(bedtimeMinutes = min("23:30"), wakeMinutes = min("06:00"), enabled = false),
             result.active.plan(monday),
         )
         assertEquals(null, result.pending.schedule)
@@ -34,11 +34,18 @@ class ChangeClassifierTest {
 
     @Test
     fun `a schedule edit clears any stale pending for that day`() {
-        val pending = ConfigPatch(schedule = mapOf(monday to base.plan(monday).copy(bedMinutes = min("23:30"))))
-        val requested = patchFor(monday, base.plan(monday).copy(bedMinutes = min("22:30")))
+        val pending = ConfigPatch(schedule = mapOf(monday to base.plan(monday).copy(bedtimeMinutes = min("23:30"))))
+        val requested = patchFor(monday, base.plan(monday).copy(bedtimeMinutes = min("22:30")))
         val result = classify(requested, pending = pending)
-        assertEquals(min("22:30"), result.active.plan(monday).bedMinutes)
+        assertEquals(min("22:30"), result.active.plan(monday).bedtimeMinutes)
         assertEquals(null, result.pending.schedule)
+    }
+
+    @Test
+    fun `wind-down lead change applies immediately`() {
+        val result = classify(ConfigPatch(windDownMinutes = 30))
+        assertEquals(30, result.active.windDownMinutes)
+        assertEquals(null, result.pending.windDownMinutes)
     }
 
     @Test

@@ -34,6 +34,24 @@ class AlarmScheduler(private val context: Context) {
     /** Post a single exact alarm (e.g. the snooze re-ring). */
     fun scheduleOne(action: String, epochMs: Long) = schedule(action, epochMs)
 
+    /**
+     * The pre-downtime reminder. Unlike the boundaries this is not an
+     * alarm-clock event (no status-bar alarm icon, no system clock entry) -
+     * a late fire under Doze is harmless for a heads-up, so use
+     * setExactAndAllowWhileIdle instead of setAlarmClock.
+     */
+    fun scheduleReminder(nowMs: Long, epochMs: Long) {
+        if (epochMs > nowMs) {
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                epochMs,
+                pendingIntent(ACTION_WINDOW_REMINDER),
+            )
+        } else {
+            cancel(ACTION_WINDOW_REMINDER)
+        }
+    }
+
     private fun schedule(action: String, epochMs: Long) {
         val showApp = PendingIntent.getActivity(
             context,
@@ -62,8 +80,17 @@ class AlarmScheduler(private val context: Context) {
     companion object {
         const val ACTION_WINDOW_OPEN = "app.bedrock.alarm.WINDOW_OPEN"
         const val ACTION_WINDOW_CLOSE = "app.bedrock.alarm.WINDOW_CLOSE"
+        const val ACTION_WINDOW_REMINDER = "app.bedrock.alarm.WINDOW_REMINDER"
         const val ACTION_GRANT_EXPIRY = "app.bedrock.alarm.GRANT_EXPIRY"
-        private val ACTIONS =
-            listOf(ACTION_WINDOW_OPEN, ACTION_WINDOW_CLOSE, ACTION_GRANT_EXPIRY)
+
+        /** How far ahead of downtime the reminder fires. */
+        const val REMINDER_LEAD_MS = 5 * 60 * 1000L
+
+        private val ACTIONS = listOf(
+            ACTION_WINDOW_OPEN,
+            ACTION_WINDOW_CLOSE,
+            ACTION_WINDOW_REMINDER,
+            ACTION_GRANT_EXPIRY,
+        )
     }
 }

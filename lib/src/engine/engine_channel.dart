@@ -35,6 +35,33 @@ class EngineChannel {
     return ConfigView.fromWire(wire!);
   }
 
+  /// Current state of the four permissions Bedrock needs.
+  Future<PermissionStatus> getPermissions() async {
+    final wire =
+        await _method.invokeMethod<Map<Object?, Object?>>('getPermissions');
+    return PermissionStatus.fromWire(wire ?? const {});
+  }
+
+  /// Show the POST_NOTIFICATIONS dialog; returns whether it's granted after.
+  /// Immediate true on Android < 13, where notifications are on by default.
+  Future<bool> requestNotifications() async =>
+      await _method.invokeMethod<bool>('requestNotifications') ?? false;
+
+  Future<void> openAccessibilitySettings() =>
+      _method.invokeMethod('openAccessibilitySettings');
+
+  Future<void> openUsageAccessSettings() =>
+      _method.invokeMethod('openUsageAccessSettings');
+
+  Future<void> openOverlaySettings() =>
+      _method.invokeMethod('openOverlaySettings');
+
+  /// Whether first-run onboarding has been completed.
+  Future<bool> isOnboarded() async =>
+      await _method.invokeMethod<bool>('isOnboarded') ?? false;
+
+  Future<void> markOnboarded() => _method.invokeMethod('markOnboarded');
+
   /// Every launchable user app (label + icon), for the Always Allowed picker.
   Future<List<InstalledApp>> getInstalledApps() async {
     final wire =

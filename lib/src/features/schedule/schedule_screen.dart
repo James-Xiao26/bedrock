@@ -64,7 +64,7 @@ class _ScheduleListState extends ConsumerState<_ScheduleList> {
     if (plans.isEmpty) return true;
     final first = plans.first;
     return plans.every(
-      (p) => p.bedMinutes == first.bedMinutes && p.wakeMinutes == first.wakeMinutes,
+      (p) => p.bedtimeMinutes == first.bedtimeMinutes && p.wakeMinutes == first.wakeMinutes,
     );
   }
 
@@ -88,7 +88,7 @@ class _ScheduleListState extends ConsumerState<_ScheduleList> {
     if (ref0 == null || _allDaysEqual) return;
     await _writeAll(
       _dayNames.keys,
-      (p) => p.copyWith(bedMinutes: ref0.bedMinutes, wakeMinutes: ref0.wakeMinutes),
+      (p) => p.copyWith(bedtimeMinutes: ref0.bedtimeMinutes, wakeMinutes: ref0.wakeMinutes),
     );
   }
 
@@ -97,14 +97,14 @@ class _ScheduleListState extends ConsumerState<_ScheduleList> {
     TimeOfDay tod(int m) => TimeOfDay(hour: m ~/ 60, minute: m % 60);
     final from = await showTimePicker(
       context: context,
-      initialTime: tod(plan.bedMinutes),
-      helpText: 'Start time',
+      initialTime: tod(plan.bedtimeMinutes),
+      helpText: 'Bedtime',
     );
     if (from == null || !mounted) return null;
     final to = await showTimePicker(
       context: context,
       initialTime: tod(plan.wakeMinutes),
-      helpText: 'End time',
+      helpText: 'Wake up',
     );
     if (to == null) return null;
     return (bed: from.hour * 60 + from.minute, wake: to.hour * 60 + to.minute);
@@ -115,7 +115,7 @@ class _ScheduleListState extends ConsumerState<_ScheduleList> {
     if (picked == null) return;
     await _writeAll(
       days,
-      (p) => p.copyWith(bedMinutes: picked.bed, wakeMinutes: picked.wake),
+      (p) => p.copyWith(bedtimeMinutes: picked.bed, wakeMinutes: picked.wake),
     );
   }
 
@@ -153,9 +153,9 @@ class _ScheduleListState extends ConsumerState<_ScheduleList> {
           ],
         ),
         const SizedBox(height: 8),
-        const _Caption('Scheduled turns on downtime for the time period you '
-            'select. A downtime reminder will appear five minutes before '
-            'downtime.'),
+        const _Caption('Downtime runs from your bedtime until you wake. It '
+            'begins a little earlier - set the wind-down time in Settings - and '
+            'a reminder appears five minutes before it starts.'),
         if (scheduled) ...[
           const SizedBox(height: 20),
           SettingGroup(
@@ -315,4 +315,4 @@ String _fmt(BuildContext context, int minutes) =>
     TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60).format(context);
 
 String _fmtRange(BuildContext context, NightPlan p) =>
-    '${_fmt(context, p.bedMinutes)} - ${_fmt(context, p.wakeMinutes)}';
+    '${_fmt(context, p.bedtimeMinutes)} - ${_fmt(context, p.wakeMinutes)}';

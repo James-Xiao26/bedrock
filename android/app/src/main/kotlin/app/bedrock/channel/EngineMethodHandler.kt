@@ -3,6 +3,7 @@ package app.bedrock.channel
 import android.content.Context
 import app.bedrock.BuildConfig
 import app.bedrock.blocking.InstalledApps
+import app.bedrock.blocking.Permissions
 import app.bedrock.engine.BedrockEngine
 import app.bedrock.engine.ConfigPatch
 import io.flutter.plugin.common.MethodCall
@@ -40,6 +41,30 @@ class EngineMethodHandler(private val context: Context) : MethodChannel.MethodCa
             }
 
             "getInstalledApps" -> result.success(InstalledApps(context).list())
+
+            "getPermissions" -> result.success(Permissions.status(context))
+
+            "openAccessibilitySettings" -> {
+                Permissions.openAccessibilitySettings(context)
+                result.success(null)
+            }
+
+            "openUsageAccessSettings" -> {
+                Permissions.openUsageAccessSettings(context)
+                result.success(null)
+            }
+
+            "openOverlaySettings" -> {
+                Permissions.openOverlaySettings(context)
+                result.success(null)
+            }
+
+            "isOnboarded" -> result.success(engine.store.isOnboarded())
+
+            "markOnboarded" -> {
+                engine.store.markOnboarded()
+                result.success(null)
+            }
 
             "getStats" -> result.success(engine.stats.summary().toWire())
 

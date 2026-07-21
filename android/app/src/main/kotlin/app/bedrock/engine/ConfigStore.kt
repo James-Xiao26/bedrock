@@ -73,6 +73,14 @@ class ConfigStore(context: Context) {
         return next
     }
 
+    /** Whether the user has finished first-run onboarding. Not engine-critical
+     *  (the engine runs on defaults regardless), just gates the first-run UI. */
+    @Synchronized
+    fun isOnboarded(): Boolean = prefs.getBoolean(KEY_ONBOARDED, false)
+
+    @Synchronized
+    fun markOnboarded() = prefs.edit().putBoolean(KEY_ONBOARDED, true).commit()
+
     /** Morning boundary: fold pending loosenings into the active config. */
     @Synchronized
     fun mergePending(): BedrockConfig {
@@ -94,5 +102,6 @@ class ConfigStore(context: Context) {
         const val KEY_PENDING = "config_pending"
         const val KEY_SNAPSHOT = "session_snapshot"
         const val KEY_PASSWORD = "hardcore_password"
+        const val KEY_ONBOARDED = "onboarded"
     }
 }

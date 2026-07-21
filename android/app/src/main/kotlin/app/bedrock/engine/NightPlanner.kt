@@ -47,8 +47,13 @@ object NightPlanner {
     fun plan(day: LocalDate, zone: ZoneId, config: BedrockConfig): PlannedWindow? {
         val plan = config.schedule[day.dayOfWeek.value] ?: return null
 
-        val openDate = if (plan.bedMinutes < NOON_MINUTES) day.plusDays(1) else day
-        val open = openDate.atTime(LocalTime.ofSecondOfDay(plan.bedMinutes * 60L)).atZone(zone)
+        // Downtime opens the wind-down lead before the chosen bedtime.
+        // ponytail: a bedtime within windDownMinutes after midnight rolls the
+        // open onto the previous calendar day; fine while onboarding sets all
+        // days equal - revisit if per-day windows ever straddle differently.
+        val openMinutes = Math.floorMod(plan.bedtimeMinutes - config.windDownMinutes, MINUTES_PER_DAY)
+        val openDate = if (openMinutes < NOON_MINUTES) day.plusDays(1) else day
+        val open = openDate.atTime(LocalTime.ofSecondOfDay(openMinutes * 60L)).atZone(zone)
 
         var close = open.toLocalDate()
             .atTime(LocalTime.ofSecondOfDay(plan.wakeMinutes * 60L))
@@ -65,4 +70,5 @@ object NightPlanner {
     }
 
     private const val NOON_MINUTES = 12 * 60
+    private const val MINUTES_PER_DAY = 24 * 60
 }

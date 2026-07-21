@@ -1,5 +1,8 @@
 package app.bedrock
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import app.bedrock.channel.EngineEventStreamer
 import app.bedrock.channel.EngineMethodHandler
 import app.bedrock.engine.BedrockEngine
@@ -11,11 +14,22 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
 
+    /** Held while the POST_NOTIFICATIONS system dialog is up (see below). */
+    private var pendingNotifResult: MethodChannel.Result? = null
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         val messenger = flutterEngine.dartExecutor.binaryMessenger
-        MethodChannel(messenger, "bedrock/engine")
-            .setMethodCallHandler(EngineMethodHandler(applicationContext))
+        val engineHandler = EngineMethodHandler(applicationContext)
+        // requestNotifications needs the Activity (runtime permission dialog);
+        // everything else is context-only and handled by the engine handler.
+        MethodChannel(messenger, "bedrock/engine").setMethodCallHandler { call, result ->
+            if (call.method == "requestNotifications") {
+                requestNotifications(result)
+            } else {
+                engineHandler.onMethodCall(call, result)
+            }
+        }
         EventChannel(messenger, "bedrock/events")
             .setStreamHandler(EngineEventStreamer)
 
@@ -36,5 +50,44 @@ class MainActivity : FlutterActivity() {
 
             override fun onFlutterUiNoLongerDisplayed() = Unit
         })
+    }
+
+    /**
+     * Request POST_NOTIFICATIONS. On API < 33 notifications are on by default,
+     * so this is an immediate yes. The result is delivered from
+     * [onRequestPermissionsResult]. FlutterActivity is a plain Activity (not an
+     * androidx ComponentActivity), so we use the classic permission callback
+     * rather than registerForActivityResult.
+     */
+    private fun requestNotifications(result: MethodChannel.Result) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            result.success(true)
+            return
+        }
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+            == PackageManager.PERMISSION_GRANTED
+        ) {
+            result.success(true)
+            return
+        }
+        pendingNotifResult = result
+        requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQ_NOTIF)
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQ_NOTIF) {
+            val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
+            pendingNotifResult?.success(granted)
+            pendingNotifResult = null
+        }
+    }
+
+    private companion object {
+        const val REQ_NOTIF = 4711
     }
 }

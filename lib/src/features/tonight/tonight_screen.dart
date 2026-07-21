@@ -143,7 +143,7 @@ class _Status extends StatelessWidget {
         t == null ? '' : TimeOfDay.fromDateTime(t).format(context);
     return switch (s.state) {
       SessionState.idle => s.windowOpen == null
-          ? 'No downtime scheduled tonight.'
+          ? ''
           : 'Downtime starts at ${at(s.windowOpen)}.',
       SessionState.active => s.windowClose == null
           ? 'Blocked apps stay blocked until your window ends.'
@@ -178,7 +178,7 @@ class _Timeline extends StatelessWidget {
           children: [
             _Endpoint(
               label: 'Bed',
-              time: _fmt(context, plan.bedMinutes),
+              time: _fmt(context, plan.bedtimeMinutes),
               align: CrossAxisAlignment.start,
             ),
             const Expanded(child: _Track()),

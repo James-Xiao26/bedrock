@@ -10,7 +10,8 @@ package app.bedrock.engine
  * persists both and merges pending at the window boundary.
  *
  * Rules per field, judged against the currently effective value:
- * - Schedule: applied now, always.
+ * - Schedule and wind-down lead: applied now, always (they only reshape the
+ *   NEXT planned window; an active window keeps its already-stored boundaries).
  * - Loosen (deferred): allowlist ADDITIONS.
  * - Tighten (applied now, clearing any contradicted pending value): allowlist
  *   REMOVALS.
@@ -38,6 +39,8 @@ object ChangeClassifier {
             newActive = newActive.copy(schedule = activeDays)
             newPending = newPending.copy(schedule = pendingDays.ifEmpty { null })
         }
+
+        requested.windDownMinutes?.let { newActive = newActive.copy(windDownMinutes = it) }
 
         requested.allowlist?.let { requestedSet ->
             // Removals tighten (apply now); additions loosen (wait).

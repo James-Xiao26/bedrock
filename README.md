@@ -1,19 +1,21 @@
 # Bedrock
 
-Put your phone to bed.
+An iOS-Downtime-style app blocker for Android.
 
-Bedrock turns your phone into a plain alarm clock between your bedtime and wake time.
-You pick a schedule for each day of the week; when bedtime hits, the screen becomes a dim night clock and every app you did not allowlist is blocked until morning.
-Calls always work, an optional alarm wakes you, and a wind-down phase dims the screen before bed so the cutoff never surprises you.
+You set a schedule for each day of the week. During the scheduled window every app is blocked except the always-allowed set and your own allowlist - but the phone stays otherwise normal (home screen and allowed apps work as usual).
+Opening a blocked app shows a lightweight blocker screen; entering your passcode grants that one app more time (5 min, 15 min, or the rest of the window).
 
-Loosening your schedule for tonight is not allowed - changes that make tonight easier only apply tomorrow.
-Normal mode offers a deliberately slow escape hatch; hardcore mode's only exit is a $1 emergency bypass.
-Your streak records every night you kept, escaped, or broke.
+The passcode is reusable and viewable in Settings before the daily cutoff, then hidden.
+If you forget it after cutoff, a $1 purchase rotates and reveals a fresh code.
+Loosening your schedule only takes effect tomorrow, never tonight.
+Stats track "clean days": a window with no passcode grant, and your streak of consecutive clean windows.
+
+Settings and the Play Store are never blocked, so you can always uninstall or force-stop the app.
 
 ## Stack
 
 - Flutter UI + business logic (`lib/`)
-- Native Kotlin enforcement engine, night clock (Jetpack Compose), alarms, and billing (`android/app/src/main/kotlin/app/bedrock/`)
+- Native Kotlin enforcement engine, per-app blocker screen (Jetpack Compose), and billing (`android/app/src/main/kotlin/app/bedrock/`)
 - All data on-device; no accounts, no backend
 
 ## Development

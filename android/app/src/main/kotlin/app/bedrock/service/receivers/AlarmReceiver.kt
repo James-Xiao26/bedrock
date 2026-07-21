@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import app.bedrock.engine.BedrockEngine
 import app.bedrock.service.AlarmScheduler
+import app.bedrock.service.ReminderNotifier
 
 /**
  * All boundary alarms funnel here. The grant-expiry alarm re-blocks an app the
@@ -16,6 +17,7 @@ class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             AlarmScheduler.ACTION_GRANT_EXPIRY -> BedrockEngine.get(context).onGrantExpiry()
+            AlarmScheduler.ACTION_WINDOW_REMINDER -> ReminderNotifier.post(context)
             else -> BedrockEngine.get(context).evaluate()
         }
     }

@@ -10,12 +10,11 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import app.bedrock.MainActivity
-import app.bedrock.blocking.AppBlockerAccessibilityService
 import app.bedrock.blocking.BlockingController
+import app.bedrock.blocking.Permissions
 import app.bedrock.blocking.UsageEventsPoller
 
 /**
@@ -65,21 +64,11 @@ class LockdownForegroundService : Service() {
     /** Called on every (re)start; the engine pokes us at each transition. */
     private fun syncMonitors() {
         val blocking = BlockingController.isActive(this)
-        if (blocking && !accessibilityEnabled()) {
+        if (blocking && !Permissions.accessibilityEnabled(this)) {
             (poller ?: UsageEventsPoller(this).also { poller = it }).start()
         } else {
             poller?.stop()
         }
-    }
-
-    private fun accessibilityEnabled(): Boolean {
-        val component =
-            "$packageName/${AppBlockerAccessibilityService::class.java.name}"
-        val enabled = Settings.Secure.getString(
-            contentResolver,
-            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
-        ) ?: return false
-        return enabled.split(':').any { it.equals(component, ignoreCase = true) }
     }
 
     private fun buildNotification(): Notification {

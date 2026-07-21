@@ -46,32 +46,33 @@ class SessionSnapshot {
 
 class NightPlan {
   const NightPlan({
-    required this.bedMinutes,
+    required this.bedtimeMinutes,
     required this.wakeMinutes,
     this.enabled = true,
   });
 
-  /// Minutes since midnight. [bedMinutes] is the window start, [wakeMinutes]
-  /// the end; a start before noon means "past midnight".
-  final int bedMinutes;
+  /// Minutes since midnight. [bedtimeMinutes] is the user's chosen bedtime;
+  /// downtime opens [EngineConfig.windDownMinutes] earlier. [wakeMinutes] is
+  /// the window end; a value before noon means "past midnight".
+  final int bedtimeMinutes;
   final int wakeMinutes;
   final bool enabled;
 
-  NightPlan copyWith({int? bedMinutes, int? wakeMinutes, bool? enabled}) =>
+  NightPlan copyWith({int? bedtimeMinutes, int? wakeMinutes, bool? enabled}) =>
       NightPlan(
-        bedMinutes: bedMinutes ?? this.bedMinutes,
+        bedtimeMinutes: bedtimeMinutes ?? this.bedtimeMinutes,
         wakeMinutes: wakeMinutes ?? this.wakeMinutes,
         enabled: enabled ?? this.enabled,
       );
 
   Map<String, Object?> toJson() => {
-        'bedMinutes': bedMinutes,
+        'bedtimeMinutes': bedtimeMinutes,
         'wakeMinutes': wakeMinutes,
         'enabled': enabled,
       };
 
   factory NightPlan.fromJson(Map<String, Object?> json) => NightPlan(
-        bedMinutes: json['bedMinutes'] as int,
+        bedtimeMinutes: json['bedtimeMinutes'] as int,
         wakeMinutes: json['wakeMinutes'] as int,
         enabled: json['enabled'] as bool? ?? true,
       );
@@ -79,12 +80,12 @@ class NightPlan {
   @override
   bool operator ==(Object other) =>
       other is NightPlan &&
-      other.bedMinutes == bedMinutes &&
+      other.bedtimeMinutes == bedtimeMinutes &&
       other.wakeMinutes == wakeMinutes &&
       other.enabled == enabled;
 
   @override
-  int get hashCode => Object.hash(bedMinutes, wakeMinutes, enabled);
+  int get hashCode => Object.hash(bedtimeMinutes, wakeMinutes, enabled);
 }
 
 /// One launchable app for the Always Allowed picker.
@@ -109,11 +110,15 @@ class InstalledApp {
 class EngineConfig {
   const EngineConfig({
     required this.schedule,
+    required this.windDownMinutes,
     required this.allowlist,
   });
 
   /// ISO day-of-week (1=Mon..7=Sun) -> the window starting that day.
   final Map<int, NightPlan> schedule;
+
+  /// How long before bedtime downtime begins (the wind-down lead).
+  final int windDownMinutes;
   final Set<String> allowlist;
 
   factory EngineConfig.fromJsonString(String raw) {
@@ -125,10 +130,37 @@ class EngineConfig {
           NightPlan.fromJson(plan as Map<String, Object?>),
         ),
       ),
+      windDownMinutes: (json['windDownMinutes'] as num?)?.toInt() ?? 60,
       allowlist:
           (json['allowlist'] as List<Object?>? ?? []).cast<String>().toSet(),
     );
   }
+}
+
+/// Which of Bedrock's four grants are currently held. Polled by onboarding
+/// (and re-polled when the user returns from a system settings screen).
+class PermissionStatus {
+  const PermissionStatus({
+    required this.notifications,
+    required this.accessibility,
+    required this.usageAccess,
+    required this.overlay,
+  });
+
+  final bool notifications;
+  final bool accessibility;
+  final bool usageAccess;
+  final bool overlay;
+
+  /// Either accessibility or usage access is enough to detect the foreground app.
+  bool get foregroundDetection => accessibility || usageAccess;
+
+  factory PermissionStatus.fromWire(Map<Object?, Object?> wire) => PermissionStatus(
+        notifications: wire['notifications'] as bool? ?? false,
+        accessibility: wire['accessibility'] as bool? ?? false,
+        usageAccess: wire['usageAccess'] as bool? ?? false,
+        overlay: wire['overlay'] as bool? ?? false,
+      );
 }
 
 /// The passcode as the engine chooses to expose it: [password] is null
@@ -151,16 +183,19 @@ class HardcorePasswordView {
 class ConfigPatch {
   const ConfigPatch({
     this.schedule,
+    this.windDownMinutes,
     this.allowlist,
   });
 
   final Map<int, NightPlan>? schedule;
+  final int? windDownMinutes;
   final Set<String>? allowlist;
 
   String toJsonString() => jsonEncode({
         if (schedule != null)
           'schedule':
               schedule!.map((day, plan) => MapEntry('$day', plan.toJson())),
+        if (windDownMinutes != null) 'windDownMinutes': windDownMinutes,
         if (allowlist != null) 'allowlist': allowlist!.toList(),
       });
 }

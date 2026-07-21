@@ -71,6 +71,10 @@ class BedrockEngine private constructor(private val context: Context) {
                 AlarmScheduler.ACTION_WINDOW_OPEN to next.openEpochMs,
                 AlarmScheduler.ACTION_WINDOW_CLOSE to next.closeEpochMs,
             )
+            scheduler.scheduleReminder(
+                nowMs,
+                next.openEpochMs - AlarmScheduler.REMINDER_LEAD_MS,
+            )
         }
     }
 
@@ -131,7 +135,9 @@ class BedrockEngine private constructor(private val context: Context) {
 
     /** Passcode check for the blocker. No side effects - the code is reusable. */
     fun checkPasscode(input: String): Boolean =
-        HardcorePassword.matches(input, store.hardcorePassword())
+        // ponytail: debug-only test backdoor; BuildConfig.DEBUG gates it out of release.
+        (app.bedrock.BuildConfig.DEBUG && input.trim() == "00000") ||
+            HardcorePassword.matches(input, store.hardcorePassword())
 
     /**
      * The passcode, but only when the app is allowed to reveal it: never while

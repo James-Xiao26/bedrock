@@ -8,11 +8,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 String _activeConfigJson() => jsonEncode({
-      'schemaVersion': 2,
+      'schemaVersion': 3,
       'schedule': {
         for (var day = 1; day <= 7; day++)
-          '$day': {'bedMinutes': 23 * 60, 'wakeMinutes': 7 * 60, 'enabled': true},
+          '$day': {
+            'bedtimeMinutes': 23 * 60,
+            'wakeMinutes': 7 * 60,
+            'enabled': true,
+          },
       },
+      'windDownMinutes': 60,
       'allowlist': <String>[],
     });
 
@@ -47,6 +52,7 @@ void main() {
           },
         'getHardcorePassword' || 'regenerateHardcorePassword' =>
           <Object?, Object?>{'viewable': false, 'password': null},
+        'isOnboarded' => true,
         _ => null,
       };
     });
@@ -71,14 +77,14 @@ void main() {
   test('getConfig decodes the active schedule', () async {
     final view = await EngineChannel().getConfig();
     expect(view.active.schedule.length, 7);
-    expect(view.active.schedule[1]!.bedMinutes, 23 * 60);
+    expect(view.active.schedule[1]!.bedtimeMinutes, 23 * 60);
     expect(view.hasPendingChanges, isFalse);
   });
 
   test('updateConfig sends a sparse JSON patch', () async {
     await EngineChannel().updateConfig(
       ConfigPatch(
-        schedule: {5: const NightPlan(bedMinutes: 1410, wakeMinutes: 480)},
+        schedule: {5: const NightPlan(bedtimeMinutes: 1410, wakeMinutes: 480)},
       ),
     );
     final call = calls.singleWhere((c) => c.method == 'updateConfig');
@@ -86,7 +92,7 @@ void main() {
         jsonDecode((call.arguments as Map)['patch'] as String) as Map;
     expect(patch.keys.toSet(), {'schedule'});
     expect(patch['schedule'], {
-      '5': {'bedMinutes': 1410, 'wakeMinutes': 480, 'enabled': true},
+      '5': {'bedtimeMinutes': 1410, 'wakeMinutes': 480, 'enabled': true},
     });
   });
 
