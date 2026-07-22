@@ -47,6 +47,11 @@ class EngineChannel {
   Future<bool> requestNotifications() async =>
       await _method.invokeMethod<bool>('requestNotifications') ?? false;
 
+  /// Toggle on-demand downtime. Only acts outside a scheduled window: starts
+  /// blocking now, or ends a running manual session. No-op otherwise.
+  Future<void> setManualDowntime(bool on) =>
+      _method.invokeMethod('setManualDowntime', {'on': on});
+
   Future<void> openAccessibilitySettings() =>
       _method.invokeMethod('openAccessibilitySettings');
 
@@ -55,6 +60,11 @@ class EngineChannel {
 
   Future<void> openOverlaySettings() =>
       _method.invokeMethod('openOverlaySettings');
+
+  /// App notification settings; the fallback when the runtime dialog no longer
+  /// appears (notifications permanently denied).
+  Future<void> openNotificationSettings() =>
+      _method.invokeMethod('openNotificationSettings');
 
   /// Whether first-run onboarding has been completed.
   Future<bool> isOnboarded() async =>

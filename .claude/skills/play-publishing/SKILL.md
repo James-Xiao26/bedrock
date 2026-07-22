@@ -22,7 +22,7 @@ Living checklist of getting Bedrock onto the Play Store. Update the status marks
 - [ ] **Device verification** — needs a PHYSICAL Android 10+ phone (emulator does NOT work — see below); sign into the Play Store with the Grounded Labs account
 - [ ] Verify developer email + phone (public on store listing — use a dedicated email, not personal)
 - [ ] Payments profile set up (legal name, bank, tax info) — needed because Bedrock has billing
-- [ ] Closed-testing track with **20 testers held 14 continuous days** (the launch bottleneck — see below)
+- [ ] Closed-testing track with **12 testers held 14 continuous days** (the launch bottleneck — see below)
 - [ ] Apply for production access
 - [ ] Store listing (screenshots, description, privacy policy, data-safety form)
 - [ ] Upload signed release AAB
@@ -34,14 +34,24 @@ Google requires proof you have access to an Android device: sign into the **Play
 - **Emulators fail**, even Google Play images. They're signed with `dev-keys` (`.../Pixel_9` reports `user/dev-keys`, SDK 35), so they are **not Play Protect certified**. Verification requires a certified device and rejects uncertified ones with a misleading *"Need Android 10 (SDK 29) or newer"* error — the SDK level isn't the real issue, certification is.
 - **Use any physical Android 10+ phone** (Android 10 = 2019, so almost anything recent). One-time step; after it, the emulator is fine for all dev/testing.
 
-## The real bottleneck: 20 testers / 14 days
+## The real bottleneck: 12 testers / 14 days
 
 Personal accounts created after Nov 2023 must run a closed test before production unlocks:
-- **20 testers** opted in (real Google accounts, added by email or Google Group)
+- **12 testers** opted in (real Google accounts, added by email or Google Group)
 - held **14 continuous days**
 - only then does "apply for production" unlock
 
-Start recruiting the 20 testers early — this gates launch the way the D-U-N-S wait would have on the org path.
+Start recruiting the 12 testers early — this gates launch the way the D-U-N-S wait would have on the org path. (Google dropped this from 20 to 12; recruit a couple extra as buffer since a tester dropping out can reset the clock.)
+
+### How testers actually sign up
+
+You invite them; they opt in. There is no self-serve signup.
+1. Play Console → Testing → Closed testing: create a track, upload the AAB.
+2. Add testers by **email list** or, easier, a **Google Group** (people join the group instead of you editing the list each time).
+3. Console gives an **opt-in URL** and a **Play Store install link**. Send both to testers.
+4. Each tester, on the phone signed into the **same Google account** you added: open the opt-in URL → "Become a tester" → open the install link → install normally.
+
+Gotcha: the phone's active Google account must exactly match the added email / joined group, or the tester just sees "not available."
 
 ## Gotchas
 

@@ -29,6 +29,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.bedrock.engine.Acknowledgement
 import app.bedrock.engine.BedrockEngine
 import app.bedrock.engine.GrantKind
 import app.bedrock.engine.HardcorePassword
@@ -62,6 +63,7 @@ class BlockerActivity : ComponentActivity() {
                         engine.onCodeReset = { code -> runOnUiThread { onRevealed(code) } }
                         engine.billing.launchBypassPurchase(this) { /* error -> shown inline */ }
                     },
+                    onFreeReset = { engine.resetCodeFree() },
                     onLeave = { goHome(); finish() },
                 )
             }
@@ -112,12 +114,15 @@ private fun BlockerScreen(
     checkCode: (String) -> Boolean,
     onGrant: (GrantKind) -> Unit,
     onReset: (onRevealed: (String) -> Unit) -> Unit,
+    onFreeReset: () -> String,
     onLeave: () -> Unit,
 ) {
     var unlocked by remember { mutableStateOf(false) }
     var typed by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var revealed by remember { mutableStateOf<String?>(null) }
+    var freeMode by remember { mutableStateOf(false) }
+    var acknowledged by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -134,7 +139,33 @@ private fun BlockerScreen(
             textAlign = TextAlign.Center,
         )
 
-        if (!unlocked) {
+        if (!unlocked && freeMode) {
+            Text(
+                "Forgot your code? Reset it for free by copying the note below word for word.",
+                color = Color(0xFF8A8A9E),
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                Acknowledgement.TEXT,
+                color = Color(0xFF6A6A7E),
+                textAlign = TextAlign.Center,
+            )
+            OutlinedTextField(
+                value = acknowledged,
+                onValueChange = { acknowledged = it },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Button(
+                onClick = { onFreeReset().let { code -> revealed = code; typed = code; freeMode = false } },
+                enabled = Acknowledgement.accepts(acknowledged),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Reset my code")
+            }
+            OutlinedButton(onClick = { freeMode = false; acknowledged = "" }) {
+                Text("Back")
+            }
+        } else if (!unlocked) {
             OutlinedTextField(
                 value = typed,
                 onValueChange = { next ->
@@ -162,11 +193,14 @@ private fun BlockerScreen(
                 )
             }
             Text(
-                "Forgot your code? Reset it - this charges your Google Play account " +
-                    "\$1 and needs an internet connection.",
+                "Forgot your code? Reset it for free by copying a short note, or skip " +
+                    "the typing for \$1. Either way needs no one but you.",
                 color = Color(0xFF6A6A7E),
                 textAlign = TextAlign.Center,
             )
+            Button(onClick = { freeMode = true; revealed = null }, modifier = Modifier.fillMaxWidth()) {
+                Text("Reset code for free")
+            }
             OutlinedButton(onClick = { onReset { code -> revealed = code; typed = code } }) {
                 Text("Reset code (\$1)")
             }

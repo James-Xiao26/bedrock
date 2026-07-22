@@ -70,6 +70,16 @@ class SessionStateMachineTest {
     }
 
     @Test
+    fun `a manual window is not recorded in stats when it closes`() {
+        val manual = active(window.copy(manual = true))
+        val t = SessionStateMachine.transition(manual, SessionEvent.WindowCloseDue)
+        assertEquals(SessionState.IDLE, t.snapshot.state)
+        assertTrue(Effect.StopBlocking in t.effects)
+        // RecordWindow still fires (for MergePendingConfig ordering) but with no window.
+        assertEquals(null, t.effects.filterIsInstance<Effect.RecordWindow>().single().window)
+    }
+
+    @Test
     fun `snapshot survives serialization round trip`() {
         val snapshot = active().copy(grantUsed = true)
         val json = kotlinx.serialization.json.Json.encodeToString(Snapshot.serializer(), snapshot)

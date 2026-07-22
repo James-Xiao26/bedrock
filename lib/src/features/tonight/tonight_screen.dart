@@ -15,50 +15,20 @@ class TonightScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionStateProvider);
     final config = ref.watch(configProvider).valueOrNull;
-    final snap = session.valueOrNull;
-    final active = snap?.state == SessionState.active;
 
     final plan = config?.active.schedule[DateTime.now().weekday];
     final hasWindow = plan != null && plan.enabled;
 
-    return Stack(
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 28, 24, 40),
       children: [
-        // Ambient glow bleeding from the top edge - warm when downtime is on.
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 420,
-          child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: const Alignment(0, -1.1),
-                  radius: 1.1,
-                  colors: [
-                    (active
-                            ? BedrockColors.accent
-                            : BedrockColors.onSurfaceMuted)
-                        .withValues(alpha: active ? 0.16 : 0.06),
-                    BedrockColors.background.withValues(alpha: 0),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        ListView(
-          padding: const EdgeInsets.fromLTRB(24, 28, 24, 40),
-          children: [
-            const _Greeting(),
-            const SizedBox(height: 56),
-            _Status(session: session),
-            if (hasWindow) ...[
-              const SizedBox(height: 64),
-              _Timeline(plan: plan),
-            ],
-          ],
-        ),
+        const _Greeting(),
+        const SizedBox(height: 56),
+        _Status(session: session),
+        if (hasWindow) ...[
+          const SizedBox(height: 64),
+          _Timeline(plan: plan),
+        ],
       ],
     );
   }

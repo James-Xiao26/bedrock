@@ -39,62 +39,29 @@ class _StatsScreenState extends ConsumerState<StatsScreen>
   @override
   Widget build(BuildContext context) {
     final stats = ref.watch(statsProvider);
-    return Stack(
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 28, 24, 40),
       children: [
-        const _TopGlow(),
-        ListView(
-          padding: const EdgeInsets.fromLTRB(24, 28, 24, 40),
-          children: [
-            const Text(
-              'YOUR HISTORY',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 1.5,
-                color: BedrockColors.onSurfaceMuted,
-              ),
-            ),
-            const SizedBox(height: 24),
-            switch (stats) {
-              AsyncData(:final value) => _StatsBody(stats: value),
-              AsyncError() => const _Empty(
-                  'Stats unavailable. Reopen the app to retry.'),
-              _ => const Padding(
-                  padding: EdgeInsets.only(top: 40),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-            },
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _TopGlow extends StatelessWidget {
-  const _TopGlow();
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      height: 420,
-      child: IgnorePointer(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: RadialGradient(
-              center: const Alignment(0, -1.1),
-              radius: 1.1,
-              colors: [
-                BedrockColors.accent.withValues(alpha: 0.10),
-                BedrockColors.background.withValues(alpha: 0),
-              ],
-            ),
+        const Text(
+          'YOUR HISTORY',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.5,
+            color: BedrockColors.onSurfaceMuted,
           ),
         ),
-      ),
+        const SizedBox(height: 24),
+        switch (stats) {
+          AsyncData(:final value) => _StatsBody(stats: value),
+          AsyncError() =>
+            const _Empty('Stats unavailable. Reopen the app to retry.'),
+          _ => const Padding(
+              padding: EdgeInsets.only(top: 40),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+        },
+      ],
     );
   }
 }

@@ -140,6 +140,7 @@ class _ScheduleListState extends ConsumerState<_ScheduleList> {
         const _Caption('During downtime, only apps you allow and phone calls '
             'will be available.'),
         const SizedBox(height: 20),
+        const _DowntimeToggle(),
         if (view.hasPendingChanges) ...[
           const _PendingBanner(),
           const SizedBox(height: 16),
@@ -200,6 +201,60 @@ class _ScheduleListState extends ConsumerState<_ScheduleList> {
         const _Caption('Downtime will apply to this device. A downtime reminder '
             'will appear five minutes before downtime begins.'),
       ],
+    );
+  }
+}
+
+/// On-demand downtime button. Shown only outside a scheduled window: it starts
+/// a manual session when idle and ends it when running. During a scheduled
+/// window it renders nothing - that downtime is governed by the schedule.
+class _DowntimeToggle extends ConsumerWidget {
+  const _DowntimeToggle();
+
+  static const _danger = Color(0xFFE5695B);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(sessionStateProvider).valueOrNull;
+    if (session == null) return const SizedBox.shrink();
+
+    final active = session.state == SessionState.active;
+    // A scheduled window is in effect: the manual toggle doesn't apply.
+    if (active && !session.manual) return const SizedBox.shrink();
+
+    final on = active && session.manual;
+    Future<void> toggle() =>
+        ref.read(engineChannelProvider).setManualDowntime(!on);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: SizedBox(
+        width: double.infinity,
+        height: 54,
+        child: Material(
+          color: on ? BedrockColors.surface : BedrockColors.accent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: on
+                ? const BorderSide(color: BedrockColors.hairline)
+                : BorderSide.none,
+          ),
+          child: InkWell(
+            onTap: toggle,
+            borderRadius: BorderRadius.circular(16),
+            child: Center(
+              child: Text(
+                on ? 'Turn Off Downtime' : 'Turn On Downtime',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                  color: on ? _danger : BedrockColors.onAccent,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

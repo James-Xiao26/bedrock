@@ -48,6 +48,10 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow>
   bool _wantClock = false;
   bool _clockSeeded = false;
 
+  /// True once we've shown the runtime notification dialog. After that a denial
+  /// won't reappear, so the step routes to settings instead.
+  bool _notifRequested = false;
+
   PermissionStatus? _perms;
 
   EngineChannel get _engine => ref.read(engineChannelProvider);
@@ -321,21 +325,29 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow>
 
   Widget _notificationsStep() {
     final on = _perms?.notifications ?? false;
+    // Before the dialog has been shown: request it. After a denial it won't
+    // reappear, so send the user to notification settings instead.
+    final useSettings = _notifRequested;
     return _Scaffold(
       onBack: _back,
       title: 'A nudge before\ndowntime.',
       intro: 'Bedrock sends one reminder five minutes before downtime starts, '
           'and a quiet note while it\'s on. Nothing else.',
-      primaryLabel: on ? 'Continue' : 'Allow notifications',
+      primaryLabel: on
+          ? 'Continue'
+          : useSettings
+              ? 'Open notification settings'
+              : 'Allow notifications',
       onPrimary: on
           ? _next
-          : () async {
-              await _engine.requestNotifications();
-              await _refreshPerms();
-              _next();
-            },
-      secondaryLabel: on ? null : 'Not now',
-      onSecondary: on ? null : _next,
+          : useSettings
+              ? _engine.openNotificationSettings
+              : () async {
+                  final granted = await _engine.requestNotifications();
+                  setState(() => _notifRequested = true);
+                  await _refreshPerms();
+                  if (granted) _next();
+                },
       body: _GrantState(granted: on, grantedLabel: 'Notifications on'),
     );
   }
@@ -351,8 +363,6 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow>
       onPrimary: on ? _next : _engine.openAccessibilitySettings,
       secondaryLabel: on ? null : 'Use App Usage access instead',
       onSecondary: on ? null : _engine.openUsageAccessSettings,
-      tertiaryLabel: on ? null : 'Set up later',
-      onTertiary: on ? null : _next,
       body: on
           ? const _GrantState(
               granted: true, grantedLabel: 'Foreground detection on')
@@ -369,8 +379,6 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow>
           'Allow "Display over other apps" to let it appear.',
       primaryLabel: on ? 'Continue' : 'Open overlay settings',
       onPrimary: on ? _next : _engine.openOverlaySettings,
-      secondaryLabel: on ? null : 'Not now',
-      onSecondary: on ? null : _next,
       body: _GrantState(granted: on, grantedLabel: 'Overlay allowed'),
     );
   }
@@ -403,8 +411,6 @@ class _Scaffold extends StatelessWidget {
     this.intro,
     this.secondaryLabel,
     this.onSecondary,
-    this.tertiaryLabel,
-    this.onTertiary,
     this.onBack,
     this.showBack = true,
   });
@@ -416,8 +422,6 @@ class _Scaffold extends StatelessWidget {
   final VoidCallback? onPrimary;
   final String? secondaryLabel;
   final VoidCallback? onSecondary;
-  final String? tertiaryLabel;
-  final VoidCallback? onTertiary;
   final VoidCallback? onBack;
   final bool showBack;
 
@@ -437,7 +441,23 @@ class _Scaffold extends StatelessWidget {
                         color: BedrockColors.onSurfaceMuted),
                   ),
                 )
-              : null,
+              : const Padding(
+                  // ponytail: brand wordmark shown only where there's no back
+                  // button, i.e. the welcome step.
+                  padding: EdgeInsets.only(left: 24),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Bedrock',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.2,
+                        color: BedrockColors.accent,
+                      ),
+                    ),
+                  ),
+                ),
         ),
         Expanded(
           child: ListView(
@@ -486,16 +506,6 @@ class _Scaffold extends StatelessWidget {
                   child: Text(secondaryLabel!),
                 ),
               ],
-              if (tertiaryLabel != null)
-                TextButton(
-                  onPressed: onTertiary,
-                  style: TextButton.styleFrom(
-                    foregroundColor: BedrockColors.onSurfaceMuted.withValues(alpha: 0.7),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    textStyle: const TextStyle(fontSize: 13),
-                  ),
-                  child: Text(tertiaryLabel!),
-                ),
             ],
           ),
         ),

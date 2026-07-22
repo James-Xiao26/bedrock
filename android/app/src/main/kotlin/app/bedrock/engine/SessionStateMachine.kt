@@ -26,6 +26,8 @@ data class WindowContext(
     val windowKey: String,
     val openEpochMs: Long,
     val closeEpochMs: Long,
+    /** User-started on-demand downtime, not a scheduled night: not recorded in stats. */
+    val manual: Boolean = false,
 )
 
 @Serializable
@@ -86,12 +88,14 @@ object SessionStateMachine {
     private fun endWindow(current: Snapshot, forced: WindowOutcome? = null): Transition {
         val outcome = forced
             ?: if (current.grantUsed) WindowOutcome.UNLOCKED else WindowOutcome.CLEAN
+        // Manual on-demand downtime isn't a slept night; keep it out of stats.
+        val recorded = current.window?.takeUnless { it.manual }
         return Transition(
             Snapshot(),
             listOf(
                 Effect.StopBlocking,
                 Effect.StopGuardService,
-                Effect.RecordWindow(outcome, current.window),
+                Effect.RecordWindow(outcome, recorded),
                 Effect.MergePendingConfig,
                 Effect.PersistAndBroadcast,
             ),

@@ -59,6 +59,11 @@ class EngineMethodHandler(private val context: Context) : MethodChannel.MethodCa
                 result.success(null)
             }
 
+            "openNotificationSettings" -> {
+                Permissions.openNotificationSettings(context)
+                result.success(null)
+            }
+
             "isOnboarded" -> result.success(engine.store.isOnboarded())
 
             "markOnboarded" -> {
@@ -80,8 +85,14 @@ class EngineMethodHandler(private val context: Context) : MethodChannel.MethodCa
                         "blocking" to snapshot.blocking,
                         "windowOpen" to snapshot.window?.openEpochMs,
                         "windowClose" to snapshot.window?.closeEpochMs,
+                        "manual" to (snapshot.window?.manual ?: false),
                     ),
                 )
+            }
+
+            "setManualDowntime" -> {
+                engine.setManualDowntime(call.argument<Boolean>("on") ?: false)
+                result.success(null)
             }
 
             "startDemoSession" -> {

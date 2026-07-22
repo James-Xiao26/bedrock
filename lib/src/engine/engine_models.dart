@@ -22,12 +22,16 @@ class SessionSnapshot {
   const SessionSnapshot({
     required this.state,
     required this.blocking,
+    this.manual = false,
     this.windowOpen,
     this.windowClose,
   });
 
   final SessionState state;
   final bool blocking;
+
+  /// The active window is a user-started on-demand session, not a scheduled one.
+  final bool manual;
   final DateTime? windowOpen;
   final DateTime? windowClose;
 
@@ -38,6 +42,7 @@ class SessionSnapshot {
     return SessionSnapshot(
       state: SessionState.fromWire(wire['state'] as String),
       blocking: wire['blocking'] as bool? ?? false,
+      manual: wire['manual'] as bool? ?? false,
       windowOpen: epoch(wire['windowOpen']),
       windowClose: epoch(wire['windowClose']),
     );

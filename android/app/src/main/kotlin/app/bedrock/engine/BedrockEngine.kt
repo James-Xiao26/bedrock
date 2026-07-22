@@ -159,13 +159,55 @@ class BedrockEngine private constructor(private val context: Context) {
         return mapOf("viewable" to true, "password" to store.rotateHardcorePassword())
     }
 
-    /** Paid reset ($1): rotate the code and reveal it to the waiting blocker. */
-    private fun onBypassPurchased() {
+    /** Rotate the code and reveal it to the waiting blocker; returns the new code. */
+    private fun rotateAndReveal(): String {
         val fresh = store.rotateHardcorePassword()
         onCodeReset?.invoke(fresh)
+        return fresh
     }
 
+    /** Paid reset ($1): rotate the code and reveal it. */
+    private fun onBypassPurchased() {
+        rotateAndReveal()
+    }
+
+    /**
+     * Free reset: rotate the code and return the new one. Gated in the UI by the
+     * [Acknowledgement] transcription, not by payment. Like the paid path this
+     * rotates even while blocking - that is the point of a reset.
+     */
+    @Synchronized
+    fun resetCodeFree(): String = rotateAndReveal()
+
     private fun passwordViewable(): Boolean = !store.snapshot().blocking
+
+    /**
+     * On-demand downtime the user toggles from the Downtime screen. Only acts
+     * outside a scheduled window: starts blocking now (when IDLE) or ends a
+     * running manual session (when ACTIVE and manual). A scheduled window is
+     * left untouched - that's what the schedule and escape code govern.
+     */
+    @Synchronized
+    fun setManualDowntime(on: Boolean, nowMs: Long = System.currentTimeMillis()) {
+        val snapshot = store.snapshot()
+        if (on) {
+            if (snapshot.state != SessionState.IDLE) return
+            // ponytail: 24h safety ceiling so a forgotten manual session can't
+            // block forever; the user is expected to toggle it off.
+            val ctx = WindowContext(
+                windowKey = "manual-" + Instant.ofEpochMilli(nowMs),
+                openEpochMs = nowMs,
+                closeEpochMs = nowMs + 24 * 60 * 60_000L,
+                manual = true,
+            )
+            dispatch(SessionEvent.WindowOpenDue(ctx))
+            scheduler.scheduleBoundaries(nowMs, AlarmScheduler.ACTION_WINDOW_CLOSE to ctx.closeEpochMs)
+        } else {
+            if (snapshot.state != SessionState.ACTIVE || snapshot.window?.manual != true) return
+            dispatch(SessionEvent.WindowCloseDue)
+            evaluate(nowMs) // hand off to the schedule if a scheduled window is now due
+        }
+    }
 
     /** Debug builds only: open a window now and close it after a few seconds. */
     @Synchronized

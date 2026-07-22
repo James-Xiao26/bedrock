@@ -59,6 +59,13 @@ object Permissions {
     fun openUsageAccessSettings(context: Context) =
         open(context, Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
 
+    /** App notification settings - the fallback when the runtime dialog won't reappear. */
+    fun openNotificationSettings(context: Context) = open(
+        context,
+        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+    )
+
     fun openOverlaySettings(context: Context) = open(
         context,
         Intent(
