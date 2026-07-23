@@ -72,6 +72,14 @@ class EngineChannel {
 
   Future<void> markOnboarded() => _method.invokeMethod('markOnboarded');
 
+  /// The user's chosen display name, or null if unset. Cosmetic only, stored
+  /// on-device.
+  Future<String?> getDisplayName() =>
+      _method.invokeMethod<String>('getDisplayName');
+
+  Future<void> setDisplayName(String name) =>
+      _method.invokeMethod('setDisplayName', {'name': name});
+
   /// Every launchable user app (label + icon), for the Always Allowed picker.
   Future<List<InstalledApp>> getInstalledApps() async {
     final wire =
@@ -102,16 +110,6 @@ class EngineChannel {
         .invokeMethod<Map<Object?, Object?>>('regenerateHardcorePassword');
     return HardcorePasswordView.fromWire(wire!);
   }
-
-  /// Debug builds only: run a compressed fake night.
-  Future<void> startDemoSession({
-    int windDownSeconds = 15,
-    int sleepSeconds = 30,
-  }) =>
-      _method.invokeMethod('startDemoSession', {
-        'windDownSeconds': windDownSeconds,
-        'sleepSeconds': sleepSeconds,
-      });
 
   Stream<EngineEvent> events() =>
       _events.receiveBroadcastStream().map(EngineEvent.fromWire);

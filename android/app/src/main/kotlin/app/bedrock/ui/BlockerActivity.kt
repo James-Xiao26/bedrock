@@ -4,8 +4,13 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,10 +26,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathMeasure
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -33,6 +45,8 @@ import app.bedrock.engine.Acknowledgement
 import app.bedrock.engine.BedrockEngine
 import app.bedrock.engine.GrantKind
 import app.bedrock.engine.HardcorePassword
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The per-app blocker. Shown whenever a blocked app is opened during a
@@ -193,17 +207,14 @@ private fun BlockerScreen(
                 )
             }
             Text(
-                "Forgot your code? Reset it for free by copying a short note, or skip " +
-                    "the typing for \$1. Either way needs no one but you.",
+                "Forgot your code? Reset it for \$1 - it needs no one but you.",
                 color = Color(0xFF6A6A7E),
                 textAlign = TextAlign.Center,
             )
-            Button(onClick = { freeMode = true; revealed = null }, modifier = Modifier.fillMaxWidth()) {
-                Text("Reset code for free")
-            }
-            OutlinedButton(onClick = { onReset { code -> revealed = code; typed = code } }) {
-                Text("Reset code (\$1)")
-            }
+            HoldableBypassButton(
+                onTap = { onReset { code -> revealed = code; typed = code } },
+                onHold = { freeMode = true; revealed = null },
+            )
             error?.let { Text(it, color = Color(0xFFB05A5A), textAlign = TextAlign.Center) }
         } else {
             Text("How much longer?", color = Color(0xFF8A8A9E))
@@ -221,3 +232,86 @@ private fun BlockerScreen(
         OutlinedButton(onClick = onLeave) { Text("Leave, go home") }
     }
 }
+
+/**
+ * The $1 bypass button, styled like an outlined button. A normal tap launches
+ * the paid bypass; a deliberate 10-second hold reveals the free (copy-a-note)
+ * reset. The free path is intentionally hidden behind the hold so it isn't an
+ * obvious one-tap escape, only a fallback for someone who knows to look.
+ */
+@Composable
+private fun HoldableBypassButton(onTap: () -> Unit, onHold: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    // Traces the button's border from 0 to 1 over the hold; a very subtle,
+    // unlabelled progress ring so someone who knows the gesture gets feedback
+    // without advertising the free path to a casual tapper.
+    val progress = remember { Animatable(0f) }
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .drawBehind {
+                val strokePx = 1.5.dp.toPx()
+                val inset = strokePx / 2
+                val left = inset
+                val top = inset
+                val right = size.width - inset
+                val bottom = size.height - inset
+                val cx = size.width / 2
+                val r = minOf(20.dp.toPx(), (right - left) / 2, (bottom - top) / 2)
+                // Built by hand (not addRoundRect) so the path starts at the top
+                // centre and runs clockwise - that's where the trace begins.
+                val outline = Path().apply {
+                    moveTo(cx, top)
+                    lineTo(right - r, top)
+                    arcTo(Rect(right - 2 * r, top, right, top + 2 * r), -90f, 90f, false)
+                    lineTo(right, bottom - r)
+                    arcTo(Rect(right - 2 * r, bottom - 2 * r, right, bottom), 0f, 90f, false)
+                    lineTo(left + r, bottom)
+                    arcTo(Rect(left, bottom - 2 * r, left + 2 * r, bottom), 90f, 90f, false)
+                    lineTo(left, top + r)
+                    arcTo(Rect(left, top, left + 2 * r, top + 2 * r), 180f, 90f, false)
+                    lineTo(cx, top)
+                }
+                // Faint base border, always present.
+                drawPath(outline, Color(0xFF33333F), style = Stroke(strokePx))
+                val p = progress.value
+                if (p > 0f) {
+                    val measure = PathMeasure().apply { setPath(outline, false) }
+                    val traced = Path()
+                    measure.getSegment(0f, measure.length * p, traced, true)
+                    // Low alpha so the trace stays a whisper, not a highlight.
+                    drawPath(traced, Color(0x558B96E6), style = Stroke(strokePx))
+                }
+            }
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        val fill = scope.launch {
+                            progress.snapTo(0f)
+                            progress.animateTo(
+                                1f,
+                                tween(HOLD_TO_FREE_MS.toInt(), easing = LinearEasing),
+                            )
+                        }
+                        // Released before the 10s timeout -> normal tap ($1);
+                        // still held when it fires -> the hidden free reset.
+                        val released = withTimeoutOrNull(HOLD_TO_FREE_MS) { tryAwaitRelease() }
+                        fill.cancel()
+                        when (released) {
+                            null -> onHold()
+                            else -> {
+                                if (released == true) onTap()
+                                scope.launch { progress.animateTo(0f, tween(250)) }
+                            }
+                        }
+                    },
+                )
+            }
+            .padding(horizontal = 24.dp, vertical = 10.dp),
+    ) {
+        Text("Reset code (\$1)", color = Color(0xFF8B96E6))
+    }
+}
+
+private const val HOLD_TO_FREE_MS = 10_000L

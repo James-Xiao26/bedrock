@@ -32,6 +32,11 @@ final configProvider = FutureProvider<ConfigView>((ref) async {
   return ref.watch(engineChannelProvider).getConfig();
 });
 
+/// The user's display name (null if unset). Invalidated after a Settings edit.
+final displayNameProvider = FutureProvider<String?>(
+  (ref) => ref.watch(engineChannelProvider).getDisplayName(),
+);
+
 /// Installed launchable apps for the Always Allowed picker. Loaded once - the
 /// set of installed apps rarely changes within a session.
 final installedAppsProvider = FutureProvider<List<InstalledApp>>(

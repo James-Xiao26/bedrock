@@ -1,61 +1,61 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../engine/engine_providers.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/collapsible_section.dart';
 import '../schedule/schedule_screen.dart';
 import '../settings/settings_screen.dart';
 import '../stats/stats_screen.dart';
 import '../tonight/tonight_screen.dart';
 
-/// Root scaffold with a ScreenZen-style bottom navigation bar. Each tab is a
-/// full screen; the engine providers are shared across them via Riverpod.
-class AppShell extends StatefulWidget {
+/// The whole app on one calm surface: Today at the top, then the Schedule and
+/// Stats editors as collapsible blocks, with Settings tucked behind a gear in
+/// the top-right. No bottom nav; the engine providers are shared via Riverpod.
+class AppShell extends ConsumerWidget {
   const AppShell({super.key});
 
   @override
-  State<AppShell> createState() => _AppShellState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final config = ref.watch(configProvider).valueOrNull;
+    final stats = ref.watch(statsProvider).valueOrNull;
 
-class _AppShellState extends State<AppShell> {
-  int _index = 0;
-
-  static const _tabs = [
-    TonightScreen(),
-    ScheduleScreen(),
-    StatsScreen(),
-    SettingsScreen(),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: IndexedStack(index: _index, children: _tabs),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.today_outlined),
-            selectedIcon: Icon(Icons.today),
-            label: 'Today',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.calendar_today_outlined),
-            selectedIcon: Icon(Icons.calendar_today),
-            label: 'Schedule',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.insights_outlined),
-            selectedIcon: Icon(Icons.insights),
-            label: 'Stats',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.tune_outlined),
-            selectedIcon: Icon(Icons.tune),
-            label: 'Settings',
-          ),
-        ],
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 48),
+          children: [
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                icon: const Icon(Icons.settings_outlined),
+                color: BedrockColors.onSurfaceMuted,
+                tooltip: 'Settings',
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => Scaffold(
+                      appBar: AppBar(title: const Text('Settings')),
+                      body: const SettingsScreen(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const TonightContent(),
+            const SizedBox(height: 48),
+            CollapsibleSection(
+              title: 'Schedule',
+              summary: config == null ? null : scheduleSummary(context, config),
+              child: const ScheduleContent(),
+            ),
+            CollapsibleSection(
+              title: 'Stats',
+              summary: stats == null ? null : statsSummary(stats),
+              child: const StatsContent(),
+            ),
+          ],
+        ),
       ),
     );
   }

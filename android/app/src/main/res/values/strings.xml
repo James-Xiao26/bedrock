@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Bedrock</string>
+    <string name="widget_downtime_description">Shows your current or next downtime window.</string>
     <string name="accessibility_service_description">
         During your scheduled downtime window, Bedrock watches which app comes
         to the front and blocks it if it is not on your allowed list. It only

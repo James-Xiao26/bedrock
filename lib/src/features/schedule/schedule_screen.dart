@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../engine/engine_models.dart';
 import '../../engine/engine_providers.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/bedtime_pairing.dart';
 import '../../widgets/section_card.dart';
 
 const _dayNames = {
@@ -16,41 +17,59 @@ const _dayNames = {
   7: 'Sunday',
 };
 
-// iOS Downtime lists Sunday first.
+// Sunday first, matching both iOS Downtime and Android's Bedtime day row.
 const _dayOrder = [7, 1, 2, 3, 4, 5, 6];
 
-/// Downtime schedule editor, modelled on iOS Screen Time > Downtime. Every edit
-/// goes straight to the engine; the native freeze rules decide whether it
-/// applies now or at the next window.
-class ScheduleScreen extends ConsumerWidget {
-  const ScheduleScreen({super.key});
+const _dayInitials = {
+  1: 'M',
+  2: 'T',
+  3: 'W',
+  4: 'T',
+  5: 'F',
+  6: 'S',
+  7: 'S',
+};
+
+/// Today's downtime window as a short string for the collapsed section header:
+/// the time range when today runs, or "Off today".
+String scheduleSummary(BuildContext context, ConfigView view) {
+  final plan = view.active.schedule[DateTime.now().weekday];
+  if (plan == null || !plan.enabled) return 'Off today';
+  return _fmtRange(context, plan);
+}
+
+/// Downtime schedule editor, styled after Android's Bedtime routine (day
+/// circles + big Start/End) but keeping iOS-Downtime's per-day flexibility.
+/// Every edit goes straight to the engine; the native freeze rules decide
+/// whether it applies now or at the next window. Returns a [Column] for the
+/// single-page home scroll.
+class ScheduleContent extends ConsumerWidget {
+  const ScheduleContent({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final config = ref.watch(configProvider);
     return switch (config) {
-      AsyncData(:final value) => _ScheduleList(view: value),
-      AsyncError(:final error) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text('Engine error: $error'),
-          ),
+      AsyncData(:final value) => _ScheduleEditor(view: value),
+      AsyncError(:final error) => Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text('Engine error: $error'),
         ),
       _ => const Center(child: CircularProgressIndicator()),
     };
   }
 }
 
-class _ScheduleList extends ConsumerStatefulWidget {
-  const _ScheduleList({required this.view});
+class _ScheduleEditor extends ConsumerStatefulWidget {
+  const _ScheduleEditor({required this.view});
 
   final ConfigView view;
 
   @override
-  ConsumerState<_ScheduleList> createState() => _ScheduleListState();
+  ConsumerState<_ScheduleEditor> createState() => _ScheduleEditorState();
 }
 
-class _ScheduleListState extends ConsumerState<_ScheduleList> {
+class _ScheduleEditorState extends ConsumerState<_ScheduleEditor> {
   /// null until first build derives it from the active config.
   bool? _customize;
 
@@ -78,8 +97,8 @@ class _ScheduleListState extends ConsumerState<_ScheduleList> {
     return ref.read(engineChannelProvider).updateConfig(ConfigPatch(schedule: patch));
   }
 
-  Future<void> _setScheduled(bool on) =>
-      _writeAll(_dayNames.keys, (p) => p.copyWith(enabled: on));
+  Future<void> _toggleDay(int day) =>
+      _writeAll([day], (p) => p.copyWith(enabled: !p.enabled));
 
   /// Collapse every day onto the first day's window.
   Future<void> _selectEveryDay() async {
@@ -122,43 +141,40 @@ class _ScheduleListState extends ConsumerState<_ScheduleList> {
   @override
   Widget build(BuildContext context) {
     final view = widget.view;
-    final scheduled = _scheduled;
     final ref0 = _schedule[_dayOrder.first];
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Downtime',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w700,
-            color: BedrockColors.onSurface,
-          ),
-        ),
-        const SizedBox(height: 8),
         const _Caption('During downtime, only apps you allow and phone calls '
-            'will be available.'),
+            'will be available. Tap a day to schedule it.'),
+        const SizedBox(height: 12),
+        const _Caption('For better health, aim to sleep and wake at the same '
+            'time every day - keep the window identical across days. One rest '
+            'day a week is fine if you need it.'),
+        const SizedBox(height: 12),
+        const _Caption('Give yourself at least 8 hours of sleep. Set downtime '
+            'to start when you should be asleep, or about 15 minutes earlier to '
+            'cover your nighttime routine.'),
         const SizedBox(height: 20),
-        const _DowntimeToggle(),
         if (view.hasPendingChanges) ...[
           const _PendingBanner(),
           const SizedBox(height: 16),
         ],
-        SettingGroup(
-          rows: [
-            SettingRow(
-              title: 'Scheduled',
-              trailing: Switch(value: scheduled, onChanged: _setScheduled),
-            ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            for (final d in _dayOrder)
+              if (_schedule[d] case final p?)
+                _DayCircle(
+                  label: _dayInitials[d]!,
+                  on: p.enabled,
+                  onTap: () => _toggleDay(d),
+                ),
           ],
         ),
-        const SizedBox(height: 8),
-        const _Caption('Downtime runs from your bedtime until you wake. It '
-            'begins a little earlier - set the wind-down time in Settings - and '
-            'a reminder appears five minutes before it starts.'),
-        if (scheduled) ...[
-          const SizedBox(height: 20),
+        if (_scheduled) ...[
+          const SizedBox(height: 24),
           SettingGroup(
             rows: [
               _SelectRow(
@@ -189,72 +205,137 @@ class _ScheduleListState extends ConsumerState<_ScheduleList> {
           else if (ref0 != null)
             SettingGroup(
               rows: [
-                _WindowRow(
-                  label: 'Time',
-                  value: _fmtRange(context, ref0),
+                _StartEndRow(
+                  plan: ref0,
                   onTap: () => _editWindow(_dayNames.keys, ref0),
                 ),
               ],
             ),
         ],
+        const SizedBox(height: 12),
+        const _Caption('Downtime runs from your bedtime until you wake. It '
+            'begins a little earlier, and a reminder appears five minutes '
+            'before it starts.'),
+        const SizedBox(height: 28),
+        const BedtimePairingRow(),
         const SizedBox(height: 8),
-        const _Caption('Downtime will apply to this device. A downtime reminder '
-            'will appear five minutes before downtime begins.'),
+        const _Caption('Your phone\'s Bedtime mode can dim and quiet the screen '
+            'as an early warning before Bedrock locks in.'),
       ],
     );
   }
 }
 
-/// On-demand downtime button. Shown only outside a scheduled window: it starts
-/// a manual session when idle and ends it when running. During a scheduled
-/// window it renders nothing - that downtime is governed by the schedule.
-class _DowntimeToggle extends ConsumerWidget {
-  const _DowntimeToggle();
+/// A single day toggle: an accent-filled circle with the weekday initial when
+/// that day is scheduled, an outlined circle when it is off.
+class _DayCircle extends StatelessWidget {
+  const _DayCircle({
+    required this.label,
+    required this.on,
+    required this.onTap,
+  });
 
-  static const _danger = Color(0xFFE5695B);
+  final String label;
+  final bool on;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final session = ref.watch(sessionStateProvider).valueOrNull;
-    if (session == null) return const SizedBox.shrink();
-
-    final active = session.state == SessionState.active;
-    // A scheduled window is in effect: the manual toggle doesn't apply.
-    if (active && !session.manual) return const SizedBox.shrink();
-
-    final on = active && session.manual;
-    Future<void> toggle() =>
-        ref.read(engineChannelProvider).setManualDowntime(!on);
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: SizedBox(
-        width: double.infinity,
-        height: 54,
-        child: Material(
-          color: on ? BedrockColors.surface : BedrockColors.accent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: on
-                ? const BorderSide(color: BedrockColors.hairline)
-                : BorderSide.none,
-          ),
-          child: InkWell(
-            onTap: toggle,
-            borderRadius: BorderRadius.circular(16),
-            child: Center(
-              child: Text(
-                on ? 'Turn Off Downtime' : 'Turn On Downtime',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                  color: on ? _danger : BedrockColors.onAccent,
-                ),
-              ),
-            ),
+  Widget build(BuildContext context) {
+    return InkResponse(
+      onTap: onTap,
+      radius: 26,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: on ? BedrockColors.accent : Colors.transparent,
+          shape: BoxShape.circle,
+          border: on
+              ? null
+              : Border.all(color: BedrockColors.hairline, width: 1.5),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: on ? BedrockColors.onAccent : BedrockColors.onSurfaceMuted,
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The shared "Every Day" window shown as big Start / End times, à la Android
+/// Bedtime. The whole block is tappable and opens the time pickers.
+class _StartEndRow extends StatelessWidget {
+  const _StartEndRow({required this.plan, required this.onTap});
+
+  final NightPlan plan;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _BigTime(
+              label: 'Start',
+              time: _fmt(context, plan.bedtimeMinutes),
+              align: CrossAxisAlignment.start,
+            ),
+            _BigTime(
+              label: 'End',
+              time: _fmt(context, plan.wakeMinutes),
+              align: CrossAxisAlignment.end,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BigTime extends StatelessWidget {
+  const _BigTime({
+    required this.label,
+    required this.time,
+    required this.align,
+  });
+
+  final String label;
+  final String time;
+  final CrossAxisAlignment align;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: align,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            color: BedrockColors.onSurfaceMuted,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          time,
+          style: const TextStyle(
+            fontSize: 34,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.5,
+            color: BedrockColors.onSurface,
+          ),
+        ),
+      ],
     );
   }
 }

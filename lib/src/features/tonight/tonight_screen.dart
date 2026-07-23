@@ -5,11 +5,12 @@ import '../../engine/engine_models.dart';
 import '../../engine/engine_providers.dart';
 import '../../theme/app_theme.dart';
 
-/// The home screen. Deliberately not a stack of cards: an ambient glow at the
-/// top, the session state set as large quiet type, and a single slim timeline
-/// for tonight's window. Everything reads as one calm surface, iOS-like.
-class TonightScreen extends ConsumerWidget {
-  const TonightScreen({super.key});
+/// The "Today" block: not a stack of cards but one calm surface - a greeting,
+/// the session state as large quiet type, the on-demand downtime button, and a
+/// slim timeline for tonight's window. Returns a [Column] so it can sit at the
+/// top of the single-page home scroll.
+class TonightContent extends ConsumerWidget {
+  const TonightContent({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -19,12 +20,13 @@ class TonightScreen extends ConsumerWidget {
     final plan = config?.active.schedule[DateTime.now().weekday];
     final hasWindow = plan != null && plan.enabled;
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 28, 24, 40),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _Greeting(),
         const SizedBox(height: 56),
         _Status(session: session),
+        const _DowntimeToggle(),
         if (hasWindow) ...[
           const SizedBox(height: 64),
           _Timeline(plan: plan),
@@ -34,19 +36,83 @@ class TonightScreen extends ConsumerWidget {
   }
 }
 
-class _Greeting extends StatelessWidget {
+/// On-demand downtime button. Shown only outside a scheduled window: it starts
+/// a manual session when idle and ends it when running. During a scheduled
+/// window it renders nothing - that downtime is governed by the schedule.
+class _DowntimeToggle extends ConsumerWidget {
+  const _DowntimeToggle();
+
+  static const _danger = Color(0xFFE5695B);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(sessionStateProvider).valueOrNull;
+    if (session == null) return const SizedBox.shrink();
+
+    final active = session.state == SessionState.active;
+    // A scheduled window is in effect: the manual toggle doesn't apply.
+    if (active && !session.manual) return const SizedBox.shrink();
+
+    final on = active && session.manual;
+    Future<void> toggle() =>
+        ref.read(engineChannelProvider).setManualDowntime(!on);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 32),
+      // Fixed width and left-anchored so the button holds its spot as the label
+      // swaps between the on and off states.
+      child: SizedBox(
+        width: 200,
+        height: 54,
+        child: Material(
+          color: on ? BedrockColors.surface : BedrockColors.accent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: on
+                ? const BorderSide(color: BedrockColors.hairline)
+                : BorderSide.none,
+          ),
+          child: InkWell(
+            onTap: toggle,
+            borderRadius: BorderRadius.circular(16),
+            child: Center(
+              child: Text(
+                on ? 'Turn Off For Now' : 'Turn On Now',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                  color: on ? _danger : BedrockColors.onAccent,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Greeting extends ConsumerWidget {
   const _Greeting();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final name = ref.watch(displayNameProvider).valueOrNull?.trim();
+    final hasName = name != null && name.isNotEmpty;
     final hour = DateTime.now().hour;
     final greeting = hour < 5
-        ? 'Still up?'
-        : hour < 12
-            ? 'Good morning'
-            : hour < 18
-                ? 'Good afternoon'
-                : 'Good evening';
+        ? (hasName ? 'Still up, $name?' : 'Still up?')
+        : hasName
+            ? (hour < 12
+                ? 'Good morning, $name'
+                : hour < 18
+                    ? 'Good afternoon, $name'
+                    : 'Good evening, $name')
+            : (hour < 12
+                ? 'Good morning'
+                : hour < 18
+                    ? 'Good afternoon'
+                    : 'Good evening');
     return Text(
       greeting.toUpperCase(),
       style: const TextStyle(
@@ -117,7 +183,9 @@ class _Status extends StatelessWidget {
           : 'Downtime starts at ${at(s.windowOpen)}.',
       SessionState.active => s.windowClose == null
           ? 'Blocked apps stay blocked until your window ends.'
-          : 'Everything unblocks at ${at(s.windowClose)}.',
+          : s.manual
+              ? 'Ends at ${at(s.windowClose)}.'
+              : 'Everything unblocks at ${at(s.windowClose)}.',
     };
   }
 }

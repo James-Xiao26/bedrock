@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:bedrock/main.dart';
 import 'package:bedrock/src/engine/engine_channel.dart';
 import 'package:bedrock/src/engine/engine_models.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -96,36 +97,38 @@ void main() {
     });
   });
 
-  testWidgets('app boots into the Today dashboard', (tester) async {
+  testWidgets('app boots into the single-page home', (tester) async {
     await tester.pumpWidget(const ProviderScope(child: BedrockApp()));
     await tester.pumpAndSettle();
-    // Hero status card reflects the IDLE session.
+    // Today status reflects the IDLE session.
     expect(find.text('Apps unblocked'), findsOneWidget);
-    // Bottom navigation exposes the tabs.
-    expect(find.text('Today'), findsOneWidget);
-    expect(find.text('Schedule'), findsOneWidget);
+    // Schedule and Stats are collapsible section headers, not tabs.
+    expect(find.text('Downtime'), findsOneWidget);
     expect(find.text('Stats'), findsOneWidget);
-    expect(find.text('Settings'), findsOneWidget);
+    // Settings lives behind a gear icon in the top-right.
+    expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
   });
 
-  testWidgets('schedule tab shows the Downtime editor in Every Day mode',
+  testWidgets('expanding Downtime shows the editor in Every Day mode',
       (tester) async {
+    // Tall surface so the whole editor fits without scroll gymnastics.
+    await tester.binding.setSurfaceSize(const Size(1000, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(const ProviderScope(child: BedrockApp()));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Schedule'));
+    await tester.tap(find.text('Downtime'));
     await tester.pumpAndSettle();
-    // Master toggle + Every Day/Customize selector, defaulting to a single
-    // Time row (all seven days share one window).
-    expect(find.text('Scheduled'), findsOneWidget);
+    // Every Day/Customize selector, defaulting to the shared Start/End window
+    // (all seven days share one window).
     expect(find.text('Every Day'), findsOneWidget);
     expect(find.text('Customize Days'), findsOneWidget);
-    expect(find.text('Time'), findsOneWidget);
+    expect(find.text('Start'), findsOneWidget);
+    expect(find.text('End'), findsOneWidget);
     // Per-day rows only appear after switching to Customize.
     expect(find.text('Monday'), findsNothing);
     await tester.tap(find.text('Customize Days'));
     await tester.pumpAndSettle();
     expect(find.text('Monday'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Saturday'), 200);
     expect(find.text('Saturday'), findsOneWidget);
   });
 }

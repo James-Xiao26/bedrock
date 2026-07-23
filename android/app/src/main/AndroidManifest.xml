@@ -86,6 +86,14 @@
                 android:resource="@xml/accessibility_service_config"/>
         </service>
 
+        <receiver android:name=".widget.BedrockWidget" android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/widget_downtime_info"/>
+        </receiver>
+
         <receiver android:name=".service.receivers.AlarmReceiver" android:exported="false"/>
         <receiver android:name=".service.receivers.BootReceiver" android:exported="false">
             <intent-filter>

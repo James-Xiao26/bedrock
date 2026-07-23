@@ -9,6 +9,8 @@ import app.bedrock.channel.EngineEventStreamer
 import app.bedrock.service.AlarmScheduler
 import app.bedrock.service.LockdownForegroundService
 import app.bedrock.ui.BlockerActivity
+import app.bedrock.widget.BedrockWidget
+import app.bedrock.widget.WidgetStatus
 import java.time.Instant
 import java.time.ZoneId
 
@@ -95,6 +97,7 @@ class BedrockEngine private constructor(private val context: Context) {
         if (!store.snapshot().blocking) store.mergePending()
         EngineEventStreamer.emit("configChanged")
         evaluate(nowMs)
+        BedrockWidget.refresh(context)
         return ChangeClassifier.Result(store.activeConfig(), store.pendingPatch())
     }
 
@@ -192,12 +195,19 @@ class BedrockEngine private constructor(private val context: Context) {
         val snapshot = store.snapshot()
         if (on) {
             if (snapshot.state != SessionState.IDLE) return
-            // ponytail: 24h safety ceiling so a forgotten manual session can't
-            // block forever; the user is expected to toggle it off.
+            // On-demand downtime ends when the next scheduled window ends (the
+            // user's usual wake time), so turning it on early just brings
+            // tonight's downtime forward.
+            // ponytail: 24h ceiling as the fallback/safety cap - used when no
+            // window is scheduled ahead, or one is absurdly far off, so a
+            // forgotten manual session can't block forever.
+            val cap = nowMs + 24 * 60 * 60_000L
+            val close = NightPlanner.nextNight(nowMs, zone(), store.activeConfig())
+                ?.closeEpochMs?.coerceAtMost(cap) ?: cap
             val ctx = WindowContext(
                 windowKey = "manual-" + Instant.ofEpochMilli(nowMs),
                 openEpochMs = nowMs,
-                closeEpochMs = nowMs + 24 * 60 * 60_000L,
+                closeEpochMs = close,
                 manual = true,
             )
             dispatch(SessionEvent.WindowOpenDue(ctx))
@@ -232,6 +242,7 @@ class BedrockEngine private constructor(private val context: Context) {
                     "sessionStateChanged",
                     mapOf("state" to snapshot.state.name),
                 )
+                BedrockWidget.refresh(context)
             }
             Effect.MergePendingConfig -> {
                 store.mergePending()
@@ -259,6 +270,20 @@ class BedrockEngine private constructor(private val context: Context) {
                 BlockerActivity.closeIfShowing()
             }
         }
+    }
+
+    /** Current window if blocking, else the next planned one - for the home-screen widget. */
+    @Synchronized
+    fun widgetStatus(nowMs: Long = System.currentTimeMillis()): WidgetStatus {
+        val snap = store.snapshot()
+        val window = snap.window
+        if (snap.state == SessionState.ACTIVE && window != null) {
+            return WidgetStatus(active = true, manual = window.manual,
+                openMs = window.openEpochMs, closeMs = window.closeEpochMs)
+        }
+        val next = NightPlanner.nextNight(nowMs, zone(), store.activeConfig())
+        return WidgetStatus(active = false, manual = false,
+            openMs = next?.openEpochMs, closeMs = next?.closeEpochMs)
     }
 
     private fun zone(): ZoneId = ZoneId.systemDefault()

@@ -6,18 +6,23 @@ import '../../engine/engine_providers.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/section_card.dart';
 
+/// Streak summary for the collapsed section header, or null when nothing has
+/// been recorded yet.
+String? statsSummary(StatsView v) =>
+    v.totalWindows == 0 ? null : '${v.currentStreak} clean';
+
 /// Sleep stats: current streak, lifetime totals, and a strip of recent nights
 /// coloured by how each one ended. Editorial layout - big type, hairlines, no
 /// cards. Re-reads on resume since the event stream may have died while
-/// backgrounded.
-class StatsScreen extends ConsumerStatefulWidget {
-  const StatsScreen({super.key});
+/// backgrounded. Returns the body directly for the single-page home scroll.
+class StatsContent extends ConsumerStatefulWidget {
+  const StatsContent({super.key});
 
   @override
-  ConsumerState<StatsScreen> createState() => _StatsScreenState();
+  ConsumerState<StatsContent> createState() => _StatsContentState();
 }
 
-class _StatsScreenState extends ConsumerState<StatsScreen>
+class _StatsContentState extends ConsumerState<StatsContent>
     with WidgetsBindingObserver {
   @override
   void initState() {
@@ -39,30 +44,15 @@ class _StatsScreenState extends ConsumerState<StatsScreen>
   @override
   Widget build(BuildContext context) {
     final stats = ref.watch(statsProvider);
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 28, 24, 40),
-      children: [
-        const Text(
-          'YOUR HISTORY',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1.5,
-            color: BedrockColors.onSurfaceMuted,
-          ),
+    return switch (stats) {
+      AsyncData(:final value) => _StatsBody(stats: value),
+      AsyncError() =>
+        const _Empty('Stats unavailable. Reopen the app to retry.'),
+      _ => const Padding(
+          padding: EdgeInsets.only(top: 40),
+          child: Center(child: CircularProgressIndicator()),
         ),
-        const SizedBox(height: 24),
-        switch (stats) {
-          AsyncData(:final value) => _StatsBody(stats: value),
-          AsyncError() =>
-            const _Empty('Stats unavailable. Reopen the app to retry.'),
-          _ => const Padding(
-              padding: EdgeInsets.only(top: 40),
-              child: Center(child: CircularProgressIndicator()),
-            ),
-        },
-      ],
-    );
+    };
   }
 }
 

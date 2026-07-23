@@ -81,6 +81,19 @@ class ConfigStore(context: Context) {
     @Synchronized
     fun markOnboarded() = prefs.edit().putBoolean(KEY_ONBOARDED, true).commit()
 
+    /** The user's chosen display name, or null if unset. Cosmetic only - never
+     *  flows through the freeze rules or engine logic. Stays on-device. */
+    @Synchronized
+    fun displayName(): String? = prefs.getString(KEY_NAME, null)
+
+    @Synchronized
+    fun setDisplayName(name: String) {
+        val trimmed = name.trim()
+        prefs.edit().apply {
+            if (trimmed.isEmpty()) remove(KEY_NAME) else putString(KEY_NAME, trimmed)
+        }.commit()
+    }
+
     /** Morning boundary: fold pending loosenings into the active config. */
     @Synchronized
     fun mergePending(): BedrockConfig {
@@ -103,5 +116,6 @@ class ConfigStore(context: Context) {
         const val KEY_SNAPSHOT = "session_snapshot"
         const val KEY_PASSWORD = "hardcore_password"
         const val KEY_ONBOARDED = "onboarded"
+        const val KEY_NAME = "display_name"
     }
 }

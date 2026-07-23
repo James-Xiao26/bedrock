@@ -17,6 +17,7 @@ enum _Step {
   notifications,
   accessibility,
   overlay,
+  name,
   confirm,
 }
 
@@ -41,6 +42,7 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow>
   // Local answers.
   final Set<String> _problems = {};
   final TextEditingController _otherController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
   TimeOfDay _bedtime = const TimeOfDay(hour: 23, minute: 0);
   TimeOfDay _wake = const TimeOfDay(hour: 7, minute: 0);
   final Set<String> _allowlist = {};
@@ -75,6 +77,7 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _otherController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
@@ -152,6 +155,9 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow>
     };
     await _engine
         .updateConfig(ConfigPatch(schedule: schedule, allowlist: _allowlist));
+    final name = _nameController.text.trim();
+    if (name.isNotEmpty) await _engine.setDisplayName(name);
+    ref.invalidate(displayNameProvider);
     await _engine.markOnboarded();
     if (mounted) widget.onDone();
   }
@@ -169,6 +175,7 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow>
           _Step.notifications => _notificationsStep(),
           _Step.accessibility => _accessibilityStep(),
           _Step.overlay => _overlayStep(),
+          _Step.name => _nameStep(),
           _Step.confirm => _confirmStep(),
         },
       ),
@@ -383,13 +390,53 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow>
     );
   }
 
+  Widget _nameStep() => _Scaffold(
+        onBack: _back,
+        title: 'What should we\ncall you?',
+        intro: 'We\'ll use it to greet you. It stays on this phone - no account, '
+            'nothing uploaded. You can skip this or change it later.',
+        primaryLabel: 'Continue',
+        onPrimary: _next,
+        body: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: TextField(
+            controller: _nameController,
+            maxLength: 30,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _next(),
+            cursorColor: BedrockColors.accent,
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w500,
+              color: BedrockColors.onSurface,
+            ),
+            buildCounter: (_,
+                    {required currentLength, required isFocused, maxLength}) =>
+                null,
+            decoration: const InputDecoration(
+              hintText: 'Your name',
+              hintStyle: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w500,
+                color: BedrockColors.onSurfaceMuted,
+              ),
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+        ),
+      );
+
   Widget _confirmStep() {
     final start = _downtimeStart.format(context);
     final wake = _wake.format(context);
     final allowed = _allowlist.length;
+    final name = _nameController.text.trim();
     return _Scaffold(
       onBack: _back,
-      title: 'You\'re set.',
+      title: name.isEmpty ? 'You\'re set.' : 'You\'re set, $name.',
       intro: 'Downtime runs $start to $wake, every day. '
           '${allowed == 0 ? 'No extra apps allowed' : '$allowed app${allowed == 1 ? '' : 's'} stay open'} '
           'while it\'s on. Change any of this anytime in Settings.',

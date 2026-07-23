@@ -71,6 +71,13 @@ class EngineMethodHandler(private val context: Context) : MethodChannel.MethodCa
                 result.success(null)
             }
 
+            "getDisplayName" -> result.success(engine.store.displayName())
+
+            "setDisplayName" -> {
+                engine.store.setDisplayName(call.argument<String>("name") ?: "")
+                result.success(null)
+            }
+
             "getStats" -> result.success(engine.stats.summary().toWire())
 
             "getHardcorePassword" -> result.success(engine.hardcorePasswordView())
