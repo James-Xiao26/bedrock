@@ -9,6 +9,16 @@ How Bedrock should come across to users. Reference this whenever writing
 anything a user reads: Play listing, screenshots, onboarding copy, the tester
 recruitment pitch, a landing page.
 
+## Store listing (locked)
+
+- **Play title (30-char max):** `Bedrock: Bedtime App Blocker` (28 chars). Keywords: *bedtime* (differentiator) + *app blocker* (head term).
+- **Short description (80-char max, final):** `Block apps at night for better sleep and less screen time. No ads, no tracking.` (78 chars)
+- **Full description (final):** see `full-description.txt` in this skill dir - ASO-optimized (bedtime app blocker / block apps / screen time / sleep / night repeated naturally), calm voice, no clinical claims, $1 framed as friction not paywall.
+- **Developer name:** Grounded Labs.
+- **Play category:** Health & Fitness (fits the sleep/bedtime positioning; less crowded than Productivity's blocker pack). Editable later.
+- **Tags:** Productivity, Sleep, Health & Fitness.
+- **Brand display font:** PT Serif Bold (700) - use for the app name "Bedrock" and other important/hero words in graphics (feature graphic, screenshots, landing page). Free Google Font, OFL license. Body/UI text stays in the app's existing sans; PT Serif is for display/wordmark only.
+
 ## What Bedrock is (one line)
 
 A minimalist bedtime app blocker for people serious about their sleep and health - it collects nothing about you, and locks away the apps that keep you up.
@@ -21,14 +31,14 @@ A minimalist bedtime app blocker for people serious about their sleep and health
 
 3. **For people who are serious.** Not a casual "screentime awareness" tool. It's for people genuinely committed to improving their sleep and health and ready to take a hard line with their phone at night.
 
-4. **Hardcore mode.** For people who are fully locked in and committed to never staying up on their phone again. The uncompromising option for users who want no easy way out.
+4. **Uncompromising by default.** There is no separate "hardcore mode" - the firm, no-easy-way-out behavior is just how Bedrock works. When the blocked hours start, the apps are locked, with no exceptions to talk yourself into at midnight. Speak to people who already want that discipline; never frame it as an optional toggle.
 
 5. **The $1 emergency unblock.** Apps can be unblocked in a genuine emergency by paying one dollar. The point isn't the money - it's friction. A small, deliberate cost is enough to remove the temptation of reaching for your phone when you shouldn't, while never leaving you truly locked out when you actually need in.
 
 ## Voice & tone
 
 - Calm, plain, honest. Match the monotone visual design - no hype, no exclamation marks, no growth-hacky urgency.
-- Confident and a little uncompromising, especially around hardcore mode. Speak to people who already want discipline.
+- Confident and a little uncompromising - that firmness is the default behavior, not an optional mode. Speak to people who already want discipline.
 - Privacy stated as plain fact, not a feature bullet with a lock icon.
 
 ## Don'ts

@@ -54,12 +54,23 @@ class SettingsScreen extends ConsumerWidget {
                 subtitle: 'Walk through onboarding again.',
                 trailing: const Icon(Icons.chevron_right,
                     color: BedrockColors.onSurfaceMuted, size: 20),
+                // Back to the main page when done, not this Settings screen.
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (ctx) =>
-                        OnboardingFlow(onDone: () => Navigator.of(ctx).pop()),
+                    builder: (ctx) => OnboardingFlow(
+                      onDone: () =>
+                          Navigator.of(ctx).popUntil((r) => r.isFirst),
+                    ),
                   ),
                 ),
+              ),
+              SettingRow(
+                title: 'Open Accessibility settings',
+                subtitle: 'Debug: jump straight there to re-enable blocking.',
+                trailing: const Icon(Icons.chevron_right,
+                    color: BedrockColors.onSurfaceMuted, size: 20),
+                onTap: () =>
+                    ref.read(engineChannelProvider).openAccessibilitySettings(),
               ),
             ],
           ),

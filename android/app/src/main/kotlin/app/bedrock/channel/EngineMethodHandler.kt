@@ -2,6 +2,7 @@ package app.bedrock.channel
 
 import android.content.Context
 import app.bedrock.BuildConfig
+import app.bedrock.blocking.Allowlist
 import app.bedrock.blocking.InstalledApps
 import app.bedrock.blocking.Permissions
 import app.bedrock.engine.BedrockEngine
@@ -41,6 +42,12 @@ class EngineMethodHandler(private val context: Context) : MethodChannel.MethodCa
             }
 
             "getInstalledApps" -> result.success(InstalledApps(context).list())
+
+            // Packages the blocker never blocks regardless of the user's list
+            // (dialer, launcher, Settings, Play Store, Bedrock). The picker shows
+            // the launchable ones as a fixed, non-removable "always allowed" group.
+            "getSystemAllowlist" ->
+                result.success(Allowlist(context).resolve(emptySet()).toList())
 
             "getPermissions" -> result.success(Permissions.status(context))
 

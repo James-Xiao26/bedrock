@@ -47,3 +47,7 @@ app.*.map.json
 # Claude Code - keep shared skills, ignore machine-local settings & worktrees
 .claude/settings.local.json
 .claude/worktrees/
+
+# vim backup/undo files
+*~
+*.un~

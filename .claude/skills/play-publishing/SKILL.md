@@ -18,14 +18,23 @@ Living checklist of getting Bedrock onto the Play Store. Update the status marks
 
 - [x] Sign up at [play.google.com/console](https://play.google.com/console), chose personal account
 - [x] Pay $25 one-time fee
-- [ ] **Identity verification** — gov ID submitted, *Google is verifying* (in progress)
-- [ ] **Device verification** — needs a PHYSICAL Android 10+ phone (emulator does NOT work — see below); sign into the Play Store with the Grounded Labs account
-- [ ] Verify developer email + phone (public on store listing — use a dedicated email, not personal)
-- [ ] Payments profile set up (legal name, bank, tax info) — needed because Bedrock has billing
+- [x] **Identity verification** — gov ID verified by Google
+- [x] **Device verification** — done on physical phone
+- [x] Phone number verified. Developer email still to confirm (public on store listing — use a dedicated email, not personal)
+- [x] Payments profile set up (legal name, bank, tax info) — bank account verified.
+- [x] Signed release AAB built — upload keystore at `C:/Users/Jimmy/bedrock-upload.jks` (alias `upload`), Gradle reads `android/key.properties` (gitignored). Output: `build/app/outputs/bundle/release/app-release.aab`. BACK UP THE KEYSTORE.
+- [x] App created in console: name `Bedrock: Bedtime App Blocker`, package `app.bedrock`, free app.
+- [ ] **App content** declarations:
+  - [x] Privacy policy — live at `https://bedrock-app.github.io/legal/privacy-policy.html` (hosted via free GitHub org `bedrock-app`, repo `legal`, Pages from root).
+  - [x] App access / sign-in — "no restrictions" (Bedrock has no login).
+  - [ ] Ads — declare "No, contains no ads".
+  - [ ] Content rating questionnaire.
+  - [ ] Target audience & content.
+  - [ ] Data safety form — must say **collects/shares NO data** to match the privacy policy.
+- [ ] Main store listing (short + full description, icon, screenshots, feature graphic).
+- [ ] Upload AAB to a closed-testing track
 - [ ] Closed-testing track with **12 testers held 14 continuous days** (the launch bottleneck — see below)
 - [ ] Apply for production access
-- [ ] Store listing (screenshots, description, privacy policy, data-safety form)
-- [ ] Upload signed release AAB
 - [ ] Submit for review
 
 ## Device verification — needs a PHYSICAL phone (emulator does NOT work)

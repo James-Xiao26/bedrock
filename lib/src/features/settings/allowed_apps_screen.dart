@@ -19,6 +19,8 @@ class AllowedAppsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final config = ref.watch(configProvider).valueOrNull;
     final apps = ref.watch(installedAppsProvider);
+    final systemAllowed =
+        ref.watch(systemAllowlistProvider).valueOrNull ?? const <String>{};
 
     return Scaffold(
       appBar: AppBar(title: const Text('Always Allowed')),
@@ -41,6 +43,7 @@ class AllowedAppsScreen extends ConsumerWidget {
               AllowedAppsPicker(
                 allowed: c.active.allowlist,
                 apps: value,
+                systemAllowed: systemAllowed,
                 onChanged: (next) => _setAllowlist(ref, next),
               ),
             ],

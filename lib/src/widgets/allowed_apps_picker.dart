@@ -17,30 +17,56 @@ class AllowedAppsPicker extends StatelessWidget {
     required this.allowed,
     required this.apps,
     required this.onChanged,
+    this.systemAllowed = const {},
   });
 
   final Set<String> allowed;
   final List<InstalledApp> apps;
   final ValueChanged<Set<String>> onChanged;
 
+  /// Packages the blocker always allows by default (dialer, launcher, Settings,
+  /// Play Store, ...). Shown non-removable atop the user's own list.
+  final Set<String> systemAllowed;
+
   @override
   Widget build(BuildContext context) {
     final byPackage = {for (final a in apps) a.packageName: a};
-    // Allowed entries, keeping any allowlisted package we can't resolve to an
-    // installed app (shown by package name) so it stays removable.
-    final allowedApps = allowed.map(
-      (pkg) =>
-          byPackage[pkg] ??
-          InstalledApp(packageName: pkg, label: pkg, icon: Uint8List(0)),
-    ).toList()
+    // Default-allowed apps, resolved to their launchable entries (non-launchable
+    // system packages like SystemUI simply won't be in [apps] and are skipped).
+    final systemApps = apps
+        .where((a) => systemAllowed.contains(a.packageName))
+        .toList()
       ..sort((a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
-    final choosable =
-        apps.where((a) => !allowed.contains(a.packageName)).toList();
+    // The user's own allowlist, minus anything already covered by the defaults.
+    final allowedApps = allowed
+        .where((pkg) => !systemAllowed.contains(pkg))
+        .map(
+          (pkg) =>
+              byPackage[pkg] ??
+              InstalledApp(packageName: pkg, label: pkg, icon: Uint8List(0)),
+        )
+        .toList()
+      ..sort((a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
+    final choosable = apps
+        .where((a) =>
+            !allowed.contains(a.packageName) &&
+            !systemAllowed.contains(a.packageName))
+        .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (systemApps.isNotEmpty) ...[
+          const SectionLabel('Always allowed by default'),
+          _AppCard(
+            apps: systemApps,
+            action: _RowAction.locked,
+            onTap: (_) {},
+          ),
+          const SizedBox(height: 28),
+        ],
         if (allowedApps.isNotEmpty) ...[
+          const SectionLabel('Your allowed apps'),
           _AppCard(
             apps: allowedApps,
             action: _RowAction.remove,
@@ -72,7 +98,7 @@ class AllowedAppsPicker extends StatelessWidget {
   }
 }
 
-enum _RowAction { add, remove }
+enum _RowAction { add, remove, locked }
 
 class _AppCard extends StatelessWidget {
   const _AppCard({
@@ -113,18 +139,28 @@ class _AppRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLocked = action == _RowAction.locked;
     final isAdd = action == _RowAction.add;
     return InkWell(
-      onTap: onTap,
+      onTap: isLocked ? null : onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
           children: [
-            _CircleButton(
-              icon: isAdd ? Icons.add : Icons.remove,
-              color: isAdd ? const Color(0xFF30A46C) : const Color(0xFFE5484D),
-              onTap: onTap,
-            ),
+            if (isLocked)
+              const SizedBox(
+                width: 24,
+                height: 24,
+                child: Icon(Icons.lock_outline,
+                    size: 18, color: BedrockColors.onSurfaceMuted),
+              )
+            else
+              _CircleButton(
+                icon: isAdd ? Icons.add : Icons.remove,
+                color:
+                    isAdd ? const Color(0xFF30A46C) : const Color(0xFFE5484D),
+                onTap: onTap,
+              ),
             const SizedBox(width: 12),
             _AppIcon(app.icon),
             const SizedBox(width: 12),

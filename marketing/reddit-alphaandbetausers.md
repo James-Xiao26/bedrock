@@ -22,7 +22,7 @@ A few things that make it different:
 
 - **Zero data.** Nothing is saved or sent anywhere. The app never even looks at your usage.
 - **Calm by design.** Monotone, quiet, no notifications begging for attention. The opposite of the apps it blocks.
-- **A hardcore option** for people who want no easy way out at night.
+- **Uncompromising by default** - once your blocked hours start, the apps stay locked. No easy way out at night.
 - **A $1 emergency unblock** if you genuinely need an app during the blocked window. The point isn't the money, it's the friction - enough to kill the mindless reach for your phone, without ever locking you out when it's real.
 
 It's Android-only for now (iOS later).

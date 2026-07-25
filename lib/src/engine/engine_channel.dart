@@ -89,6 +89,13 @@ class EngineChannel {
         .toList();
   }
 
+  /// Packages the blocker always allows regardless of the user's list (dialer,
+  /// launcher, Settings, Play Store, Bedrock). Shown non-removable atop the picker.
+  Future<Set<String>> getSystemAllowlist() async {
+    final wire = await _method.invokeMethod<List<Object?>>('getSystemAllowlist');
+    return (wire ?? const []).map((e) => e as String).toSet();
+  }
+
   /// Aggregated local sleep stats (streak, totals, recent nights).
   Future<StatsView> getStats() async {
     final wire = await _method.invokeMethod<Map<Object?, Object?>>('getStats');

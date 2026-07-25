@@ -43,6 +43,12 @@ final installedAppsProvider = FutureProvider<List<InstalledApp>>(
   (ref) => ref.watch(engineChannelProvider).getInstalledApps(),
 );
 
+/// Packages the blocker always allows by default (dialer, launcher, Settings,
+/// etc.). Shown as a fixed, non-removable group atop the Always Allowed picker.
+final systemAllowlistProvider = FutureProvider<Set<String>>(
+  (ref) => ref.watch(engineChannelProvider).getSystemAllowlist(),
+);
+
 /// Local sleep stats; refreshed after every night-end. RecordNight runs in the
 /// same effect batch that fires 'sessionStateChanged', so no separate event is
 /// needed. Screens also re-read on resume, per the convention above.

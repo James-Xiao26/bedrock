@@ -2,6 +2,7 @@ package app.bedrock.engine
 
 import android.content.Context
 import android.content.SharedPreferences
+import java.time.LocalDate
 
 /**
  * Canonical persistence for config + session snapshot. Kotlin is the single
@@ -60,16 +61,30 @@ class ConfigStore(context: Context) {
      * The current hardcore escape code, generating and persisting one on first
      * read. Kept out of [BedrockConfig] on purpose: it is a rotating credential,
      * not a schedule setting, and must never flow through the freeze rules.
+     *
+     * Rotates once per calendar day, but never while a window is actively
+     * blocking: mid-block the user can't view the new code, and a code they
+     * saved earlier must keep working (the never-locked-out safety valve).
      */
     @Synchronized
-    fun hardcorePassword(): String =
-        prefs.getString(KEY_PASSWORD, null) ?: rotateHardcorePassword()
+    fun hardcorePassword(): String {
+        val stored = prefs.getString(KEY_PASSWORD, null)
+        val today = LocalDate.now().toString()
+        val staleDay = prefs.getString(KEY_PASSWORD_DAY, null) != today
+        if (stored == null || (staleDay && !snapshot().blocking)) {
+            return rotateHardcorePassword()
+        }
+        return stored
+    }
 
     /** Generate, persist, and return a fresh escape code. */
     @Synchronized
     fun rotateHardcorePassword(): String {
         val next = HardcorePassword.generate()
-        prefs.edit().putString(KEY_PASSWORD, next).commit()
+        prefs.edit()
+            .putString(KEY_PASSWORD, next)
+            .putString(KEY_PASSWORD_DAY, LocalDate.now().toString())
+            .commit()
         return next
     }
 
@@ -115,6 +130,7 @@ class ConfigStore(context: Context) {
         const val KEY_PENDING = "config_pending"
         const val KEY_SNAPSHOT = "session_snapshot"
         const val KEY_PASSWORD = "hardcore_password"
+        const val KEY_PASSWORD_DAY = "hardcore_password_day"
         const val KEY_ONBOARDED = "onboarded"
         const val KEY_NAME = "display_name"
     }
