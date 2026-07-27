@@ -1,28 +1,31 @@
-Bedrock is a bedtime app blocker for people who are done losing their nights to their phone.
+Bedrock is a social media blocker for people who are done losing hours to the feed.
 
-Set the hours you want to be off your phone. During that window, Bedrock blocks the apps that keep you scrolling - social media, video, games, whatever you choose - so putting the phone down at night becomes the easy choice instead of the hard one.
+The problem was never the apps. It is the feed - the endless, algorithmic scroll that Reels, Shorts and every home timeline are built around. You open the app to message a friend and leave forty minutes later having spoken to no one.
 
-It does one thing, and it does it quietly.
+So Bedrock blocks the feed, not the friendship.
+
+Block the scroll, keep the people.
+Turn on feed blocking and Instagram Reels, YouTube Shorts and the home feed stop opening. Your messages, your search, your profile all still work. You can still talk to the people you actually opened the app for. This is the part other app blockers cannot do - they are all or nothing, so you either lose your friends or keep the scroll.
+
+Block whole apps too, on your schedule.
+Set the hours you want to be off your phone. During that downtime window, Bedrock blocks the apps you choose - social media, video, games, whatever keeps you scrolling. Anything you mark Always Allowed stays open the whole time.
 
 No tracking, ever.
-Bedrock collects nothing about you. No account, no analytics, no "insights," no charts of your screen time. It never looks at what you do on your phone, and nothing ever leaves your device. Most screen time apps are built on watching you. Bedrock is built on leaving you alone.
+Bedrock collects nothing about you. No account, no analytics, no upload. It never measures your screen time and never records what you open. Nothing leaves your device, because there is nowhere for it to go. Most screen time apps are built on watching you. Bedrock is built on leaving you alone.
 
 Radically minimal.
-The app is calm by design - plain, monotone, nothing competing for your attention. It is the opposite of the apps it blocks. A tool meant to protect your sleep shouldn't be another bright, noisy thing on your phone.
-
-Built for people who are serious.
-This isn't a gentle "screen time awareness" nudge. Bedrock is uncompromising by design. When your blocked hours start, the apps are locked, with no easy way out and no exceptions to talk yourself into at midnight. It's for people genuinely committed to better sleep and ready to take a hard line with their phone at night.
+The app is calm by design - plain, monotone, nothing competing for your attention. It is the opposite of the apps it blocks. A tool meant to get you off the feed should not be another bright, noisy thing on your phone.
 
 Never truly locked out.
-If a real emergency comes up, you can unblock for one dollar. The point was never the money - it's a small, deliberate bit of friction, just enough to break the reflex to reach for your phone, while never leaving you stuck when you genuinely need in.
+Getting back in during a block is deliberately slow, but never impossible. There is a passcode you set, a free unblock that takes some patience to reach, and a one dollar emergency unblock for when you genuinely need in right now. The point was never the money. It is friction, just enough to break the reflex, and a free way out always exists.
 
 What Bedrock does:
-- Blocks the apps you choose during the hours you set
-- Runs automatically every night, on your schedule
+- Blocks Reels, Shorts and home feeds while leaving messaging usable
+- Blocks whole apps during the downtime hours you set
+- Runs automatically on your schedule, every day
 - Keeps everything on your device - no data collected, no ads, no account
-- Uncompromising by default - once your blocked hours start, the apps stay locked
-- One-dollar emergency unblock for the moments that truly need it
+- Friction on the way back in, with a free unblock that is always available
 
-Put your phone down at night. Get your sleep back.
+Close the feed. Keep the phone.
 
-Bedrock - a bedtime app blocker that respects your sleep and your privacy.
+Bedrock - a social media blocker that takes the scroll, not your friends.

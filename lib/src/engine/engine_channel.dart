@@ -52,6 +52,22 @@ class EngineChannel {
   Future<void> setManualDowntime(bool on) =>
       _method.invokeMethod('setManualDowntime', {'on': on});
 
+  /// Whether in-app feed blocking is on. Runs independently of downtime
+  /// windows: when on, feeds inside the watched social apps stay blocked
+  /// around the clock while the rest of each app keeps working.
+  Future<bool> getFeedBlocking() async =>
+      await _method.invokeMethod<bool>('getFeedBlocking') ?? false;
+
+  Future<void> setFeedBlocking(bool on) =>
+      _method.invokeMethod('setFeedBlocking', {'on': on});
+
+  /// Debug builds only: the view IDs on screen in the app currently in front,
+  /// for capturing feed fingerprints from real installed versions.
+  Future<List<String>> dumpWindowIds() async {
+    final wire = await _method.invokeMethod<List<Object?>>('dumpWindowIds');
+    return (wire ?? const []).map((e) => e as String).toList();
+  }
+
   Future<void> openAccessibilitySettings() =>
       _method.invokeMethod('openAccessibilitySettings');
 
@@ -66,6 +82,12 @@ class EngineChannel {
   Future<void> openNotificationSettings() =>
       _method.invokeMethod('openNotificationSettings');
 
+  /// Best-effort open of Android's Bedtime mode (inside Digital Wellbeing).
+  /// No public intent targets the exact screen, so this may land on Digital
+  /// Wellbeing or the top-level Settings.
+  Future<void> openBedtimeSettings() =>
+      _method.invokeMethod('openBedtimeSettings');
+
   /// Whether first-run onboarding has been completed.
   Future<bool> isOnboarded() async =>
       await _method.invokeMethod<bool>('isOnboarded') ?? false;
@@ -79,6 +101,14 @@ class EngineChannel {
 
   Future<void> setDisplayName(String name) =>
       _method.invokeMethod('setDisplayName', {'name': name});
+
+  /// Seconds the user must hold the $1 bypass button to reveal the free reset.
+  /// Native floors this at 10s; default is 15s.
+  Future<int> getBypassHoldSeconds() async =>
+      await _method.invokeMethod<int>('getBypassHoldSeconds') ?? 15;
+
+  Future<void> setBypassHoldSeconds(int seconds) =>
+      _method.invokeMethod('setBypassHoldSeconds', {'seconds': seconds});
 
   /// Every launchable user app (label + icon), for the Always Allowed picker.
   Future<List<InstalledApp>> getInstalledApps() async {
@@ -107,14 +137,6 @@ class EngineChannel {
   Future<HardcorePasswordView> getHardcorePassword() async {
     final wire = await _method
         .invokeMethod<Map<Object?, Object?>>('getHardcorePassword');
-    return HardcorePasswordView.fromWire(wire!);
-  }
-
-  /// Roll a fresh escape code. No-op (viewable == false) when the code is
-  /// currently hidden - you cannot generate a code you're not allowed to see.
-  Future<HardcorePasswordView> regenerateHardcorePassword() async {
-    final wire = await _method
-        .invokeMethod<Map<Object?, Object?>>('regenerateHardcorePassword');
     return HardcorePasswordView.fromWire(wire!);
   }
 

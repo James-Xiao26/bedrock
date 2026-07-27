@@ -42,6 +42,7 @@ class AppShell extends ConsumerWidget {
                 ),
               ),
             ),
+            const _PermissionWarning(),
             const TonightContent(),
             const SizedBox(height: 48),
             CollapsibleSection(
@@ -56,6 +57,76 @@ class AppShell extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Blocking is dead without the accessibility service, and Android turns it off
+/// on its own - a reinstall, a sideload over the top, some OEM battery cleaner.
+/// Nothing tells the app when that happens, so re-read the grant on every
+/// resume and say so loudly while it's off.
+class _PermissionWarning extends ConsumerStatefulWidget {
+  const _PermissionWarning();
+
+  @override
+  ConsumerState<_PermissionWarning> createState() => _PermissionWarningState();
+}
+
+class _PermissionWarningState extends ConsumerState<_PermissionWarning>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(permissionsProvider);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final granted =
+        ref.watch(permissionsProvider).valueOrNull?.accessibility ?? true;
+    if (granted) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: BedrockColors.surfaceHigh,
+        borderRadius: BorderRadius.circular(BedrockRadii.card),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Blocking is off',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Android switched off Bedrock\'s accessibility permission, so apps '
+            'will not be blocked. This happens after reinstalling the app.',
+            style: TextStyle(color: BedrockColors.onSurfaceMuted),
+          ),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: () =>
+                ref.read(engineChannelProvider).openAccessibilitySettings(),
+            child: const Text('Turn it back on'),
+          ),
+        ],
       ),
     );
   }

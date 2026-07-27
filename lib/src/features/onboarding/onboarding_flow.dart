@@ -11,8 +11,8 @@ import '../../widgets/section_card.dart';
 enum _Step {
   welcome,
   problems,
-  alarm,
   schedule,
+  bedtimeMode,
   apps,
   notifications,
   accessibility,
@@ -47,7 +47,13 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow>
   TimeOfDay _wake = const TimeOfDay(hour: 7, minute: 0);
   final Set<String> _allowlist = {};
 
-  bool _wantClock = false;
+  /// Clock app(s) Bedrock seeds so alarms survive downtime. Kept in [_allowlist]
+  /// so they're actually allowed, but surfaced in the picker's locked "default"
+  /// section so the user can't remove them and break their alarm.
+  final Set<String> _seededClocks = {};
+
+  // Always keep the phone's clock app(s) reachable during downtime so alarms
+  // still go off; a bedtime blocker must never eat your morning alarm.
   bool _clockSeeded = false;
 
   /// True once we've shown the runtime notification dialog. After that a denial
@@ -69,8 +75,9 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow>
     WidgetsBinding.instance.addObserver(this);
     _refreshPerms();
     // Subscribe now so the app list starts loading; seed the clock once it
-    // resolves (the alarm answer may come before or after it loads).
+    // resolves.
     ref.listenManual(installedAppsProvider, (_, _) => _maybeSeedClock());
+    _maybeSeedClock();
   }
 
   @override
@@ -83,24 +90,16 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Returning from a system settings screen: re-check and skip ahead if the
-    // grant the current step was asking for has landed.
-    if (state == AppLifecycleState.resumed) _refreshPerms(autoAdvance: true);
+    // Returning from a system settings screen: re-check so the granted
+    // confirmation and the "Continue" button appear. The user taps to move on.
+    if (state == AppLifecycleState.resumed) _refreshPerms();
   }
 
-  Future<void> _refreshPerms({bool autoAdvance = false}) async {
+  Future<void> _refreshPerms() async {
     final p = await _engine.getPermissions();
     if (!mounted) return;
     setState(() => _perms = p);
-    if (autoAdvance && _granted(_step, p)) _next();
   }
-
-  bool _granted(_Step step, PermissionStatus p) => switch (step) {
-        _Step.notifications => p.notifications,
-        _Step.accessibility => p.foregroundDetection,
-        _Step.overlay => p.overlay,
-        _ => false,
-      };
 
   void _next() {
     if (_index < _order.length - 1) setState(() => _index++);
@@ -110,17 +109,10 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow>
     if (_index > 0) setState(() => _index--);
   }
 
-  void _setAlarm(bool isAlarm) {
-    _wantClock = isAlarm;
-    _maybeSeedClock();
-    _next();
-  }
-
   /// Pre-allow the phone's clock app(s) so alarms stay reachable during
-  /// downtime. Runs once, whenever both the answer is "yes" and the app list
-  /// has loaded - either order.
+  /// downtime. Runs once, whenever the app list has loaded.
   void _maybeSeedClock() {
-    if (!_wantClock || _clockSeeded) return;
+    if (_clockSeeded) return;
     final apps = ref.read(installedAppsProvider).valueOrNull;
     if (apps == null) return; // retry when the listener fires
     _clockSeeded = true;
@@ -131,7 +123,10 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow>
             a.packageName.contains('alarmclock'))
         .map((a) => a.packageName);
     if (clocks.isNotEmpty && mounted) {
-      setState(() => _allowlist.addAll(clocks));
+      setState(() {
+        _allowlist.addAll(clocks);
+        _seededClocks.addAll(clocks);
+      });
     }
   }
 
@@ -169,8 +164,8 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow>
         child: switch (_step) {
           _Step.welcome => _welcome(),
           _Step.problems => _problemsStep(),
-          _Step.alarm => _alarmStep(),
           _Step.schedule => _scheduleStep(),
+          _Step.bedtimeMode => _bedtimeModeStep(),
           _Step.apps => _appsStep(),
           _Step.notifications => _notificationsStep(),
           _Step.accessibility => _accessibilityStep(),
@@ -252,19 +247,6 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow>
     );
   }
 
-  Widget _alarmStep() => _Scaffold(
-        onBack: _back,
-        title: 'Do you wake up to\nthis phone?',
-        intro: 'If your alarm lives here, Bedrock keeps the Clock app open '
-            "during downtime so it always goes off. You won't be locked out of "
-            'your morning.',
-        primaryLabel: 'Yes, it\'s my alarm',
-        onPrimary: () => _setAlarm(true),
-        secondaryLabel: 'No, I use another alarm',
-        onSecondary: () => _setAlarm(false),
-        body: const SizedBox.shrink(),
-      );
-
   Widget _scheduleStep() {
     final start = _downtimeStart.format(context);
     return _Scaffold(
@@ -299,8 +281,51 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow>
     );
   }
 
+  /// Reminder (not a Bedrock permission) to pair with Android's Bedtime mode.
+  /// Both actions just advance; the primary best-effort deep-links into
+  /// Digital Wellbeing.
+  Widget _bedtimeModeStep() => _Scaffold(
+        onBack: _back,
+        title: 'Pair with your\nphone\'s Bedtime\nmode.',
+        intro: 'Bedrock blocks the apps. Android\'s Bedtime mode dims and greys '
+            'the screen so what\'s left feels calm. They work best together.',
+        primaryLabel: 'Open Bedtime settings',
+        onPrimary: () {
+          _engine.openBedtimeSettings();
+          _next();
+        },
+        secondaryLabel: 'I\'ve set it up',
+        onSecondary: _next,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            _InfoRow(
+              Icons.contrast,
+              'Greyscale and dimming make your phone boring on purpose - the '
+                  'last apps stop pulling you in.',
+            ),
+            SizedBox(height: 18),
+            _InfoRow(
+              Icons.bedtime_outlined,
+              'Do Not Disturb silences notifications on the same schedule, so '
+                  'nothing lights up your night.',
+            ),
+            SizedBox(height: 18),
+            _InfoRow(
+              Icons.schedule,
+              'Set it to turn on 30 minutes before downtime does. It lives in '
+                  'Settings > Digital Wellbeing.',
+            ),
+          ],
+        ),
+      );
+
   Widget _appsStep() {
     final apps = ref.watch(installedAppsProvider);
+    final systemAllowed = {
+      ...?ref.watch(systemAllowlistProvider).valueOrNull,
+      ..._seededClocks,
+    };
     return _Scaffold(
       onBack: _back,
       title: 'Anything to keep\nopen?',
@@ -312,6 +337,7 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow>
         AsyncData(:final value) => AllowedAppsPicker(
             allowed: _allowlist,
             apps: value,
+            systemAllowed: systemAllowed,
             onChanged: (next) => setState(() {
               _allowlist
                 ..clear()
@@ -350,10 +376,9 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow>
           : useSettings
               ? _engine.openNotificationSettings
               : () async {
-                  final granted = await _engine.requestNotifications();
+                  await _engine.requestNotifications();
                   setState(() => _notifRequested = true);
                   await _refreshPerms();
-                  if (granted) _next();
                 },
       body: _GrantState(granted: on, grantedLabel: 'Notifications on'),
     );
@@ -589,10 +614,14 @@ class _TimeRow extends StatelessWidget {
   }
 }
 
-/// Privacy reassurance for the accessibility step. Every claim here is
-/// enforced by the code: the service sets canRetrieveWindowContent=false and
-/// listens for window-state changes only, and the release build ships without
-/// the INTERNET permission, so nothing can leave the device.
+/// Prominent disclosure for the accessibility step. Play requires this to
+/// match what the service actually does, and every claim here is enforced by
+/// the code: window content is only ever requested for packages that have a
+/// FeedRules entry, and FeedDetector keeps nothing but a fingerprint of view
+/// IDs, never text. The app has no network code of its own - the INTERNET
+/// permission in the manifest comes from the Play Billing client and is only
+/// ever used to talk to Play. Keep in sync with
+/// accessibility_service_description.
 class _PrivacyNote extends StatelessWidget {
   const _PrivacyNote();
 
@@ -603,14 +632,15 @@ class _PrivacyNote extends StatelessWidget {
       children: [
         _row(
           Icons.visibility_off_outlined,
-          'Bedrock only sees which app is in front - never your screen, your '
-              'messages, or what you type.',
+          'Bedrock sees which app is in front, and inside the social apps you '
+              'pick, whether the screen is an endless feed. It never reads your '
+              'messages, captions, or what you type.',
         ),
         const SizedBox(height: 18),
         _row(
           Icons.smartphone_outlined,
-          'Everything stays on this phone. There\'s no account and no upload, so '
-              'no one else can ever see it.',
+          'Everything stays on this phone. Nothing it reads is stored, there\'s '
+              'no account and no upload, so no one else can ever see it.',
         ),
         const SizedBox(height: 18),
         _row(
@@ -633,6 +663,35 @@ class _PrivacyNote extends StatelessWidget {
   }
 
   Widget _row(IconData icon, String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 22, color: BedrockColors.accent),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 15,
+              height: 1.45,
+              color: BedrockColors.onSurface,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// An accent-icon + text row used for informational bullet lists.
+class _InfoRow extends StatelessWidget {
+  const _InfoRow(this.icon, this.text);
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

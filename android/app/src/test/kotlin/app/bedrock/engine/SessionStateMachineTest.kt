@@ -58,6 +58,45 @@ class SessionStateMachineTest {
     }
 
     @Test
+    fun `a gap flags the window failed but keeps it active`() {
+        val t = SessionStateMachine.transition(active(), SessionEvent.GapDetected)
+        assertEquals(SessionState.ACTIVE, t.snapshot.state)
+        assertTrue(t.snapshot.violated)
+        assertTrue(t.snapshot.blocking)
+        assertTrue(Effect.PersistAndBroadcast in t.effects)
+    }
+
+    @Test
+    fun `a flagged window is recorded VIOLATED at close`() {
+        val flagged = SessionStateMachine.transition(active(), SessionEvent.GapDetected).snapshot
+        val t = SessionStateMachine.transition(flagged, SessionEvent.WindowCloseDue)
+        assertEquals(SessionState.IDLE, t.snapshot.state)
+        assertEquals(WindowOutcome.VIOLATED, t.effects.recordedOutcome())
+    }
+
+    @Test
+    fun `a repeat gap on an already-flagged window is a no-op`() {
+        val flagged = active().copy(violated = true)
+        val t = SessionStateMachine.transition(flagged, SessionEvent.GapDetected)
+        assertTrue(t.effects.isEmpty())
+        assertEquals(flagged, t.snapshot)
+    }
+
+    @Test
+    fun `a gap while idle is a no-op`() {
+        val t = SessionStateMachine.transition(Snapshot(), SessionEvent.GapDetected)
+        assertEquals(Snapshot(), t.snapshot)
+        assertTrue(t.effects.isEmpty())
+    }
+
+    @Test
+    fun `violated outweighs a used grant at close`() {
+        val both = active().copy(grantUsed = true, violated = true)
+        val t = SessionStateMachine.transition(both, SessionEvent.WindowCloseDue)
+        assertEquals(WindowOutcome.VIOLATED, t.effects.recordedOutcome())
+    }
+
+    @Test
     fun `stale or duplicate events are ignored`() {
         // Second open while already active.
         val reopen = SessionStateMachine.transition(active(), SessionEvent.WindowOpenDue(window))

@@ -16,6 +16,7 @@ import app.bedrock.MainActivity
 import app.bedrock.blocking.BlockingController
 import app.bedrock.blocking.Permissions
 import app.bedrock.blocking.UsageEventsPoller
+import app.bedrock.engine.BedrockEngine
 
 /**
  * Keeps the enforcement engine alive while a block window is active. It runs
@@ -66,6 +67,12 @@ class LockdownForegroundService : Service() {
         val blocking = BlockingController.isActive(this)
         if (blocking && !Permissions.accessibilityEnabled(this)) {
             (poller ?: UsageEventsPoller(this).also { poller = it }).start()
+            // Accessibility off AND no usage-access fallback: nothing can see the
+            // foreground app, so the window is unenforceable. Mark it failed (it
+            // stays active so re-granting either permission resumes blocking).
+            if (!Permissions.usageAccessGranted(this)) {
+                BedrockEngine.get(this).reportEnforcementGap()
+            }
         } else {
             poller?.stop()
         }

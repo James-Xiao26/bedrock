@@ -32,9 +32,28 @@ final configProvider = FutureProvider<ConfigView>((ref) async {
   return ref.watch(engineChannelProvider).getConfig();
 });
 
+/// Live permission grants. The system owns these and can revoke them behind
+/// our back (reinstall, `flutter run`, an OEM cleaner), so this is re-read on
+/// every app resume rather than cached.
+final permissionsProvider = FutureProvider<PermissionStatus>(
+  (ref) => ref.watch(engineChannelProvider).getPermissions(),
+);
+
 /// The user's display name (null if unset). Invalidated after a Settings edit.
 final displayNameProvider = FutureProvider<String?>(
   (ref) => ref.watch(engineChannelProvider).getDisplayName(),
+);
+
+/// Seconds to hold the $1 bypass button before the free reset appears.
+/// Invalidated after a Settings edit.
+final bypassHoldProvider = FutureProvider<int>(
+  (ref) => ref.watch(engineChannelProvider).getBypassHoldSeconds(),
+);
+
+/// Whether in-app feed blocking is on. Native owns the flag; nothing but the
+/// toggle itself changes it, so this is invalidated by hand after a write.
+final feedBlockingProvider = FutureProvider<bool>(
+  (ref) => ref.watch(engineChannelProvider).getFeedBlocking(),
 );
 
 /// Installed launchable apps for the Always Allowed picker. Loaded once - the

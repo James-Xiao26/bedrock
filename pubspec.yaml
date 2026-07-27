@@ -2,7 +2,7 @@ name: bedrock
 description: "Bedrock - a bedtime lockdown app. Your phone becomes an alarm clock at bedtime."
 publish_to: 'none'
 
-version: 0.1.0+1
+version: 0.2.0+5
 
 environment:
   sdk: ^3.12.2
@@ -16,6 +16,16 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
+
+# Run `dart run flutter_launcher_icons` after changing tool/appicon/ sources.
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "tool/appicon/icon.png"
+  adaptive_icon_background: "#F5F5F7"
+  adaptive_icon_foreground: "tool/appicon/foreground.png"
+  min_sdk_android: 27

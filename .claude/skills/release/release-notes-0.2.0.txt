@@ -1,0 +1,20 @@
+Release notes for 0.2.0 (versionCode 5). Play Console limit is 500 characters per language.
+
+=== Closed testing track (341 chars) ===
+
+Feed blocking is here. Turn it on and Instagram Reels, YouTube Shorts and the home feed stop opening, while your messages, search and profile keep working.
+
+Everything else is unchanged: downtime scheduling, Always Allowed apps, the passcode.
+
+Please try opening Instagram DMs during a block - that path has to stay usable. Tell me if it doesn't.
+
+=== Production / open testing (372 chars) ===
+
+Feed blocking is here. Turn it on and Instagram Reels, YouTube Shorts and the home feed stop opening, while your messages, search and profile keep working - so you can talk to people without falling into the scroll.
+
+Everything else is unchanged: downtime scheduling, Always Allowed apps, and the passcode. Still no account, no ads, and nothing about you leaves your phone.
+
+=== Notes ===
+
+Do not name TikTok. FeedRules covers Instagram and YouTube only.
+Do not describe this as a bedtime or sleep feature; that framing was retired in the 2026-07-27 pivot.

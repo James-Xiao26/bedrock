@@ -8,10 +8,10 @@ import app.bedrock.MainActivity
 import app.bedrock.service.receivers.AlarmReceiver
 
 /**
- * Exact alarms for the night's boundaries. Bedrock is an alarm-clock app, so
- * it declares USE_EXACT_ALARM and uses setAlarmClock(), which is exempt from
- * Doze and doubles as a process-resurrection point: even if the guard service
- * is killed, the next boundary alarm restarts the engine.
+ * Alarms for the night's boundaries. Uses setAlarmClock(), which is exact and
+ * Doze-exempt WITHOUT the exact-alarm permission (Play bars that for non
+ * calendar/alarm apps), and doubles as a process-resurrection point: even if
+ * the guard service is killed, the next boundary alarm restarts the engine.
  */
 class AlarmScheduler(private val context: Context) {
 
@@ -35,14 +35,14 @@ class AlarmScheduler(private val context: Context) {
     fun scheduleOne(action: String, epochMs: Long) = schedule(action, epochMs)
 
     /**
-     * The pre-downtime reminder. Unlike the boundaries this is not an
-     * alarm-clock event (no status-bar alarm icon, no system clock entry) -
-     * a late fire under Doze is harmless for a heads-up, so use
-     * setExactAndAllowWhileIdle instead of setAlarmClock.
+     * The pre-downtime reminder. Not an alarm-clock event (no status-bar alarm
+     * icon, no system clock entry) - a late fire under Doze is harmless for a
+     * heads-up, so use the inexact setAndAllowWhileIdle, which needs no
+     * exact-alarm permission.
      */
     fun scheduleReminder(nowMs: Long, epochMs: Long) {
         if (epochMs > nowMs) {
-            alarmManager.setExactAndAllowWhileIdle(
+            alarmManager.setAndAllowWhileIdle(
                 AlarmManager.RTC_WAKEUP,
                 epochMs,
                 pendingIntent(ACTION_WINDOW_REMINDER),
@@ -59,10 +59,23 @@ class AlarmScheduler(private val context: Context) {
             Intent(context, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE,
         )
-        alarmManager.setAlarmClock(
-            AlarmManager.AlarmClockInfo(epochMs, showApp),
-            pendingIntent(action),
-        )
+        // setAlarmClock() is documented exempt from the exact-alarm permission,
+        // but some OEM ROMs (seen on MediaTek Motorola) enforce it anyway and
+        // throw. A late boundary alarm is a degraded backstop - the guard
+        // service is the real enforcer - so fall back to inexact rather than
+        // crash the process on launch. ponytail: keep exact where allowed.
+        try {
+            alarmManager.setAlarmClock(
+                AlarmManager.AlarmClockInfo(epochMs, showApp),
+                pendingIntent(action),
+            )
+        } catch (_: SecurityException) {
+            alarmManager.setAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                epochMs,
+                pendingIntent(action),
+            )
+        }
     }
 
     private fun cancel(action: String) {

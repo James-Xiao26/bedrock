@@ -59,7 +59,8 @@ class BillingManager(
             )
             .build()
         client.queryProductDetailsAsync(params) { result, details ->
-            val product = details.firstOrNull()
+            // PBL 8+: callback returns QueryProductDetailsResult, not List<ProductDetails>.
+            val product = details.productDetailsList.firstOrNull()
             if (result.responseCode != BillingClient.BillingResponseCode.OK || product == null) {
                 onError("Bypass purchase is not available right now.")
                 return@queryProductDetailsAsync

@@ -63,11 +63,17 @@ class BlockerActivity : ComponentActivity() {
         val engine = BedrockEngine.get(applicationContext)
         val pkg = intent.getStringExtra(EXTRA_PACKAGE) ?: run { goHome(); finish(); return }
         val label = appLabel(pkg)
+        val holdMs = engine.store.bypassHoldSeconds() * 1000L
+        // Non-empty only when feed blocking sent us here, naming the surface
+        // ("YouTube Shorts") rather than the app, which is still usable.
+        val surface = intent.getStringExtra(EXTRA_SURFACE).orEmpty()
 
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 BlockerScreen(
                     appLabel = label,
+                    surfaceLabel = surface,
+                    holdToFreeMs = holdMs,
                     checkCode = engine::checkPasscode,
                     onGrant = { kind ->
                         engine.grantApp(pkg, kind)
@@ -112,6 +118,9 @@ class BlockerActivity : ComponentActivity() {
     companion object {
         const val EXTRA_PACKAGE = "blocked_package"
 
+        /** What was blocked ("YouTube Shorts"); absent for whole-app blocking. */
+        const val EXTRA_SURFACE = "blocked_surface"
+
         private var showing: BlockerActivity? = null
 
         /** Called by the engine when the window ends so the blocker gets out of the way. */
@@ -125,6 +134,8 @@ class BlockerActivity : ComponentActivity() {
 @Composable
 private fun BlockerScreen(
     appLabel: String,
+    surfaceLabel: String,
+    holdToFreeMs: Long,
     checkCode: (String) -> Boolean,
     onGrant: (GrantKind) -> Unit,
     onReset: (onRevealed: (String) -> Unit) -> Unit,
@@ -137,6 +148,8 @@ private fun BlockerScreen(
     var revealed by remember { mutableStateOf<String?>(null) }
     var freeMode by remember { mutableStateOf(false) }
     var acknowledged by remember { mutableStateOf("") }
+    // One tip per appearance of the blocker (new each time it's shown).
+    val tip = remember { PhoneTips.random() }
 
     Column(
         modifier = Modifier
@@ -146,9 +159,19 @@ private fun BlockerScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterVertically),
     ) {
-        Text("$appLabel is blocked", color = Color(0xFFAAAAC0), fontSize = 24.sp)
         Text(
-            "Downtime is on. Enter your passcode to give yourself more time on this app.",
+            if (surfaceLabel.isNotEmpty()) "$surfaceLabel is blocked" else "$appLabel is blocked",
+            color = Color(0xFFAAAAC0),
+            fontSize = 24.sp,
+        )
+        Text(
+            // Deliberately not "messaging still works": true of Instagram, wrong
+            // for YouTube, where what survives is search and long-form video.
+            if (surfaceLabel.isNotEmpty()) {
+                "The rest of the app still works. Only enter your passcode if you really need this."
+            } else {
+                "Downtime is on. Only enter your passcode if you really need this app right now."
+            },
             color = Color(0xFF8A8A9E),
             textAlign = TextAlign.Center,
         )
@@ -212,6 +235,7 @@ private fun BlockerScreen(
                 textAlign = TextAlign.Center,
             )
             HoldableBypassButton(
+                holdMs = holdToFreeMs,
                 onTap = { onReset { code -> revealed = code; typed = code } },
                 onHold = { freeMode = true; revealed = null },
             )
@@ -229,18 +253,27 @@ private fun BlockerScreen(
             }
         }
 
+        if (!unlocked && !freeMode) {
+            Text(
+                tip,
+                color = Color(0xFF7E8AA0),
+                textAlign = TextAlign.Center,
+                fontSize = 15.sp,
+            )
+        }
         OutlinedButton(onClick = onLeave) { Text("Leave, go home") }
     }
 }
 
 /**
  * The $1 bypass button, styled like an outlined button. A normal tap launches
- * the paid bypass; a deliberate 10-second hold reveals the free (copy-a-note)
+ * the paid bypass; a deliberate [holdMs]-long hold reveals the free (copy-a-note)
  * reset. The free path is intentionally hidden behind the hold so it isn't an
- * obvious one-tap escape, only a fallback for someone who knows to look.
+ * obvious one-tap escape, only a fallback for someone who knows to look. The
+ * hold length is user-configurable in Settings (see ConfigStore.bypassHoldSeconds).
  */
 @Composable
-private fun HoldableBypassButton(onTap: () -> Unit, onHold: () -> Unit) {
+private fun HoldableBypassButton(holdMs: Long, onTap: () -> Unit, onHold: () -> Unit) {
     val scope = rememberCoroutineScope()
     // Traces the button's border from 0 to 1 over the hold; a very subtle,
     // unlabelled progress ring so someone who knows the gesture gets feedback
@@ -291,12 +324,12 @@ private fun HoldableBypassButton(onTap: () -> Unit, onHold: () -> Unit) {
                             progress.snapTo(0f)
                             progress.animateTo(
                                 1f,
-                                tween(HOLD_TO_FREE_MS.toInt(), easing = LinearEasing),
+                                tween(holdMs.toInt(), easing = LinearEasing),
                             )
                         }
-                        // Released before the 10s timeout -> normal tap ($1);
+                        // Released before the hold completes -> normal tap ($1);
                         // still held when it fires -> the hidden free reset.
-                        val released = withTimeoutOrNull(HOLD_TO_FREE_MS) { tryAwaitRelease() }
+                        val released = withTimeoutOrNull(holdMs) { tryAwaitRelease() }
                         fill.cancel()
                         when (released) {
                             null -> onHold()
@@ -313,5 +346,3 @@ private fun HoldableBypassButton(onTap: () -> Unit, onHold: () -> Unit) {
         Text("Reset code (\$1)", color = Color(0xFF8B96E6))
     }
 }
-
-private const val HOLD_TO_FREE_MS = 10_000L

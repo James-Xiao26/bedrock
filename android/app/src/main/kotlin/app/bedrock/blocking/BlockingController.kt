@@ -25,11 +25,13 @@ object BlockingController {
     private const val KEY_ACTIVE = "active"
     private const val KEY_ALLOWED = "allowed"
     private const val KEY_GRANTS = "grants"
+    private const val KEY_FEED = "feed_block_enabled"
 
     private data class State(
         val active: Boolean,
         val allowed: Set<String>,
         val grants: Map<String, Long>,
+        val feedBlocking: Boolean,
     )
 
     private val grantSerializer = MapSerializer(String.serializer(), Long.serializer())
@@ -44,13 +46,39 @@ object BlockingController {
 
     /** Set active/allowed. Always clears grants - both calls are window boundaries. */
     fun update(context: Context, active: Boolean, allowed: Set<String>) {
+        val feed = state(context).feedBlocking
         prefs(context).edit()
             .putBoolean(KEY_ACTIVE, active)
             .putStringSet(KEY_ALLOWED, allowed)
             .remove(KEY_GRANTS)
             .commit()
-        cached = State(active, allowed, emptyMap())
+        cached = State(active, allowed, emptyMap(), feed)
         Log.i(TAG, "blocking=${if (active) "ON" else "OFF"} allowed=${allowed.size} pkgs")
+    }
+
+    /**
+     * Turn in-app feed blocking on or off. Independent of downtime windows, so
+     * unlike [update] this writes only its own key and leaves grants alone -
+     * routing it through [update] would silently drop an active passcode grant.
+     */
+    fun setFeedBlocking(context: Context, on: Boolean) {
+        prefs(context).edit().putBoolean(KEY_FEED, on).commit()
+        cached = state(context).copy(feedBlocking = on)
+        Log.i(TAG, "feedBlocking=${if (on) "ON" else "OFF"}")
+    }
+
+    fun isFeedBlocking(context: Context): Boolean = state(context).feedBlocking
+
+    /**
+     * True when a feed surface inside [packageName] must bounce right now.
+     * Shares the grant map with whole-app blocking, so a passcode or $1 bypass
+     * already bought for an app covers its feed too.
+     */
+    fun shouldBlockFeed(context: Context, packageName: String): Boolean {
+        val s = state(context)
+        if (!s.feedBlocking) return false
+        val grantUntil = s.grants[packageName] ?: return true
+        return grantUntil <= System.currentTimeMillis()
     }
 
     /** Record a passcode grant for [packageName] until [untilEpochMs]. */
@@ -85,7 +113,11 @@ object BlockingController {
         return grantUntil <= System.currentTimeMillis()
     }
 
-    fun bounceToBlocker(context: Context, blockedPackage: String) {
+    /**
+     * Bounce to the blocker. [surface] is non-empty only for feed blocking, where
+     * it names the app whose feed (rather than whose whole self) is blocked.
+     */
+    fun bounceToBlocker(context: Context, blockedPackage: String, surface: String = "") {
         Log.i(TAG, "bouncing $blockedPackage")
         context.startActivity(
             Intent(context, BlockerActivity::class.java)
@@ -94,7 +126,8 @@ object BlockingController {
                         Intent.FLAG_ACTIVITY_CLEAR_TOP or
                         Intent.FLAG_ACTIVITY_REORDER_TO_FRONT,
                 )
-                .putExtra(BlockerActivity.EXTRA_PACKAGE, blockedPackage),
+                .putExtra(BlockerActivity.EXTRA_PACKAGE, blockedPackage)
+                .putExtra(BlockerActivity.EXTRA_SURFACE, surface),
         )
     }
 
@@ -113,6 +146,7 @@ object BlockingController {
                 grants = p.getString(KEY_GRANTS, null)
                     ?.let { Json.decodeFromString(grantSerializer, it) }
                     ?: emptyMap(),
+                feedBlocking = p.getBoolean(KEY_FEED, false),
             )
         }.also { cached = it }
 

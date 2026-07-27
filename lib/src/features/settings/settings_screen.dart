@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -45,6 +46,10 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 36),
           const SectionLabel('Passcode'),
           const _PasscodeSection(),
+          const SizedBox(height: 12),
+          const _BypassHoldSection(),
+          // ponytail: debug-only; setup buttons hidden from real users.
+          if (kDebugMode) ...[
           const SizedBox(height: 36),
           const SectionLabel('Setup'),
           SettingGroup(
@@ -74,6 +79,7 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
+          ],
         ],
       ],
     );
@@ -184,6 +190,107 @@ class _NameDialogState extends State<_NameDialog> {
   }
 }
 
+/// Hold duration for the hidden free reset. The blocker's "$1 reset" button
+/// reveals the free (copy-a-note) reset only after a deliberate hold; this sets
+/// how long. Floored at 10s natively so it never becomes a quick tap.
+class _BypassHoldSection extends ConsumerWidget {
+  const _BypassHoldSection();
+
+  static const _min = 10;
+  static const _max = 30;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final seconds = ref.watch(bypassHoldProvider).valueOrNull ?? 15;
+
+    return SettingGroup(
+      rows: [
+        SettingRow(
+          title: 'Free-reset hold',
+          subtitle: 'How long to hold the \$1 reset button to reveal the free '
+              'reset.',
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('${seconds}s',
+                  style: const TextStyle(
+                      fontSize: 16, color: BedrockColors.onSurfaceMuted)),
+              const SizedBox(width: 6),
+              const Icon(Icons.chevron_right,
+                  color: BedrockColors.onSurfaceMuted, size: 20),
+            ],
+          ),
+          onTap: () => _edit(context, ref, seconds),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _edit(BuildContext context, WidgetRef ref, int current) async {
+    final next = await showDialog<int>(
+      context: context,
+      builder: (_) => _HoldDialog(initial: current, min: _min, max: _max),
+    );
+    if (next == null || next == current) return;
+    await ref.read(engineChannelProvider).setBypassHoldSeconds(next);
+    ref.invalidate(bypassHoldProvider);
+  }
+}
+
+/// Slider dialog for the free-reset hold. Stateful so the slider tracks the
+/// drag before the user commits.
+class _HoldDialog extends StatefulWidget {
+  const _HoldDialog(
+      {required this.initial, required this.min, required this.max});
+
+  final int initial;
+  final int min;
+  final int max;
+
+  @override
+  State<_HoldDialog> createState() => _HoldDialogState();
+}
+
+class _HoldDialogState extends State<_HoldDialog> {
+  late double _value = widget.initial.toDouble();
+
+  @override
+  Widget build(BuildContext context) {
+    final seconds = _value.round();
+    return AlertDialog(
+      title: const Text('Free-reset hold'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('$seconds seconds',
+              style: const TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w700,
+                  color: BedrockColors.onSurface)),
+          Slider(
+            value: _value,
+            min: widget.min.toDouble(),
+            max: widget.max.toDouble(),
+            divisions: widget.max - widget.min,
+            label: '${seconds}s',
+            onChanged: (v) => setState(() => _value = v),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(seconds),
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
 /// Shows the current passcode and lets the user roll a new one. The passcode
 /// gates per-app time grants during a window; it is hidden only while a window
 /// is actively blocking (revealing it then would defeat the blocker).
@@ -203,15 +310,7 @@ class _PasscodeSection extends ConsumerWidget {
         message: 'Your passcode is unavailable right now.',
       ),
       data: (v) => (v.viewable && v.password != null)
-          ? _CodeVisible(
-              code: v.password!,
-              onRegenerate: () async {
-                await ref
-                    .read(engineChannelProvider)
-                    .regenerateHardcorePassword();
-                ref.invalidate(hardcorePasswordProvider);
-              },
-            )
+          ? _CodeVisible(code: v.password!)
           : const _CodeHidden(
               message: 'Hidden while a window is active, so you can\'t look '
                   'it up once blocking has started.',
@@ -221,10 +320,9 @@ class _PasscodeSection extends ConsumerWidget {
 }
 
 class _CodeVisible extends StatelessWidget {
-  const _CodeVisible({required this.code, required this.onRegenerate});
+  const _CodeVisible({required this.code});
 
   final String code;
-  final Future<void> Function() onRegenerate;
 
   @override
   Widget build(BuildContext context) {
@@ -244,19 +342,15 @@ class _CodeVisible extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         const Text(
-          'Save this where you can reach it - write it down or hand it to '
-          'someone. It stays the same until you reset it.',
+          'This lets you bypass tonight\'s downtime without changing your '
+          'schedule. Only write it down if you think you\'ll need it tonight. '
+          'A new code is generated each day.',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 13,
             height: 1.35,
             color: BedrockColors.onSurfaceMuted,
           ),
-        ),
-        const SizedBox(height: 16),
-        OutlinedButton(
-          onPressed: onRegenerate,
-          child: const Text('Generate a new code'),
         ),
       ],
     );

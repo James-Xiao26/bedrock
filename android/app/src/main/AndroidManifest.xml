@@ -3,10 +3,14 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
-    <!-- Bedrock is an alarm clock; USE_EXACT_ALARM is auto-granted for alarm
-         apps, SCHEDULE_EXACT_ALARM stays as the fallback if review objects. -->
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <!-- No exact-alarm permission: window boundaries use setAlarmClock(), which
+         is exempt, and the reminder is inexact. Bedrock isn't a calendar/alarm
+         app, so Play bars USE_EXACT_ALARM/SCHEDULE_EXACT_ALARM. Strip them in
+         case a dependency merges them into the final manifest. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM"
+        tools:node="remove"/>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        tools:node="remove"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <!-- Usage-stats access is the no-accessibility fallback for detecting the
          foreground app; granted by the user via Special app access. -->
@@ -95,6 +99,14 @@
         </receiver>
 
         <receiver android:name=".service.receivers.AlarmReceiver" android:exported="false"/>
+        <!-- Wall-clock / timezone edits: re-derive the session so a clock change
+             can't skip downtime (the monotonic anchor governs the real close). -->
+        <receiver android:name=".service.receivers.ClockChangeReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.TIME_SET"/>
+                <action android:name="android.intent.action.TIMEZONE_CHANGED"/>
+            </intent-filter>
+        </receiver>
         <receiver android:name=".service.receivers.BootReceiver" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>

@@ -3,6 +3,7 @@ package app.bedrock.channel
 import android.content.Context
 import app.bedrock.BuildConfig
 import app.bedrock.blocking.Allowlist
+import app.bedrock.blocking.FeedDetector
 import app.bedrock.blocking.InstalledApps
 import app.bedrock.blocking.Permissions
 import app.bedrock.engine.BedrockEngine
@@ -71,6 +72,11 @@ class EngineMethodHandler(private val context: Context) : MethodChannel.MethodCa
                 result.success(null)
             }
 
+            "openBedtimeSettings" -> {
+                Permissions.openBedtimeSettings(context)
+                result.success(null)
+            }
+
             "isOnboarded" -> result.success(engine.store.isOnboarded())
 
             "markOnboarded" -> {
@@ -85,11 +91,17 @@ class EngineMethodHandler(private val context: Context) : MethodChannel.MethodCa
                 result.success(null)
             }
 
+            "getBypassHoldSeconds" -> result.success(engine.store.bypassHoldSeconds())
+
+            "setBypassHoldSeconds" -> {
+                // Dart always sends a value; the store floors it to the minimum.
+                call.argument<Int>("seconds")?.let { engine.store.setBypassHoldSeconds(it) }
+                result.success(null)
+            }
+
             "getStats" -> result.success(engine.stats.summary().toWire())
 
             "getHardcorePassword" -> result.success(engine.hardcorePasswordView())
-
-            "regenerateHardcorePassword" -> result.success(engine.regenerateHardcorePassword())
 
             "getSessionState" -> {
                 val snapshot = engine.store.snapshot()
@@ -107,6 +119,25 @@ class EngineMethodHandler(private val context: Context) : MethodChannel.MethodCa
             "setManualDowntime" -> {
                 engine.setManualDowntime(call.argument<Boolean>("on") ?: false)
                 result.success(null)
+            }
+
+            "getFeedBlocking" -> result.success(engine.isFeedBlocking())
+
+            "setFeedBlocking" -> {
+                engine.setFeedBlocking(call.argument<Boolean>("on") ?: false)
+                result.success(null)
+            }
+
+            // Capture real view IDs from the app currently on screen, so the
+            // fingerprints in FeedRules come from installed versions rather than
+            // from guesswork. Debug-only: it is the one call that returns another
+            // app's window contents to Dart.
+            "dumpWindowIds" -> {
+                if (!BuildConfig.DEBUG) {
+                    result.error("debug_only", "Window dumps exist only in debug builds", null)
+                    return
+                }
+                result.success(FeedDetector.dumpIds())
             }
 
             "startDemoSession" -> {

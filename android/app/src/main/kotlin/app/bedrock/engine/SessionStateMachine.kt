@@ -28,6 +28,16 @@ data class WindowContext(
     val closeEpochMs: Long,
     /** User-started on-demand downtime, not a scheduled night: not recorded in stats. */
     val manual: Boolean = false,
+    /**
+     * Monotonic ([android.os.SystemClock.elapsedRealtime]) anchor stamped at open,
+     * and the matching monotonic deadline. These let the engine judge the real
+     * time left in the window independently of the wall clock, so setting the
+     * system clock forward can't skip downtime. Null on legacy snapshots and
+     * across reboots (the monotonic clock resets), where the engine falls back
+     * to the wall clock. See [WindowClock].
+     */
+    val openElapsedMs: Long? = null,
+    val closeElapsedMs: Long? = null,
 )
 
 @Serializable
@@ -38,6 +48,13 @@ data class Snapshot(
     val blocking: Boolean = false,
     /** Set when the user spent a passcode grant this window; recorded at close. */
     val grantUsed: Boolean = false,
+    /**
+     * Set when the engine caught a coverage gap this window (force-stop, or no
+     * usable foreground monitor). Sticky until close, where it records VIOLATED.
+     * Unlike [SessionEvent.ViolationDetected] this keeps the window ACTIVE - we
+     * never reward losing enforcement by ending downtime early.
+     */
+    val violated: Boolean = false,
 )
 
 sealed interface SessionEvent {
@@ -49,6 +66,13 @@ sealed interface SessionEvent {
 
     /** Engine detected tampering (force-stop gap, service revoked mid-window). */
     data object ViolationDetected : SessionEvent
+
+    /**
+     * Coverage gap noticed while the window is still running (no usable
+     * foreground monitor). Flags the window failed but leaves it ACTIVE so
+     * re-granting resumes enforcement. Recorded VIOLATED at close.
+     */
+    data object GapDetected : SessionEvent
 }
 
 sealed interface Effect {
@@ -83,11 +107,20 @@ object SessionStateMachine {
             SessionState.IDLE -> ignore(current)
             else -> endWindow(current, forced = WindowOutcome.VIOLATED)
         }
+
+        SessionEvent.GapDetected -> when {
+            current.state == SessionState.ACTIVE && !current.violated ->
+                Transition(current.copy(violated = true), listOf(Effect.PersistAndBroadcast))
+            else -> ignore(current)
+        }
     }
 
     private fun endWindow(current: Snapshot, forced: WindowOutcome? = null): Transition {
-        val outcome = forced
-            ?: if (current.grantUsed) WindowOutcome.UNLOCKED else WindowOutcome.CLEAN
+        val outcome = forced ?: when {
+            current.violated -> WindowOutcome.VIOLATED
+            current.grantUsed -> WindowOutcome.UNLOCKED
+            else -> WindowOutcome.CLEAN
+        }
         // Manual on-demand downtime isn't a slept night; keep it out of stats.
         val recorded = current.window?.takeUnless { it.manual }
         return Transition(

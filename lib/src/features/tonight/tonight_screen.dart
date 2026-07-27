@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -27,6 +28,9 @@ class TonightContent extends ConsumerWidget {
         const SizedBox(height: 56),
         _Status(session: session),
         const _DowntimeToggle(),
+        // Debug-only while the accessibility declaration this needs is still
+        // being written; the release service can't read window content anyway.
+        if (kDebugMode) const _FeedBlockToggle(),
         if (hasWindow) ...[
           const SizedBox(height: 64),
           _Timeline(plan: plan),
@@ -87,6 +91,59 @@ class _DowntimeToggle extends ConsumerWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// In-app feed blocking. Unlike [_DowntimeToggle] this is persistent state
+/// rather than a momentary action, and it runs whether or not a window is
+/// open, so it reads as a switch and stays visible during downtime.
+class _FeedBlockToggle extends ConsumerWidget {
+  const _FeedBlockToggle();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final on = ref.watch(feedBlockingProvider).valueOrNull ?? false;
+
+    Future<void> set(bool next) async {
+      await ref.read(engineChannelProvider).setFeedBlocking(next);
+      ref.invalidate(feedBlockingProvider);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 36),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Block feeds',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    color: BedrockColors.onSurface,
+                  ),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Reels, Shorts and the home feed stay shut. Messaging keeps '
+                  'working.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.35,
+                    color: BedrockColors.onSurfaceMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 20),
+          Switch(value: on, onChanged: set),
+        ],
       ),
     );
   }

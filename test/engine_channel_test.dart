@@ -51,9 +51,10 @@ void main() {
             'totalWindows': 0,
             'recent': <Object?>[],
           },
-        'getHardcorePassword' || 'regenerateHardcorePassword' =>
+        'getHardcorePassword' =>
           <Object?, Object?>{'viewable': false, 'password': null},
         'isOnboarded' => true,
+        'getFeedBlocking' => false,
         _ => null,
       };
     });
@@ -98,25 +99,40 @@ void main() {
   });
 
   testWidgets('app boots into the single-page home', (tester) async {
+    // Tall enough that the whole single-page scroll is on screen at once.
+    await tester.binding.setSurfaceSize(const Size(1000, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(const ProviderScope(child: BedrockApp()));
     await tester.pumpAndSettle();
     // Today status reflects the IDLE session.
     expect(find.text('Apps unblocked'), findsOneWidget);
     // Schedule and Stats are collapsible section headers, not tabs.
-    expect(find.text('Downtime'), findsOneWidget);
+    expect(find.text('Schedule'), findsOneWidget);
     expect(find.text('Stats'), findsOneWidget);
     // Settings lives behind a gear icon in the top-right.
     expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
   });
 
-  testWidgets('expanding Downtime shows the editor in Every Day mode',
+  testWidgets('the feed toggle sends its new value to the engine',
+      (tester) async {
+    await tester.pumpWidget(const ProviderScope(child: BedrockApp()));
+    await tester.pumpAndSettle();
+    expect(find.text('Block feeds'), findsOneWidget);
+
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
+    final call = calls.singleWhere((c) => c.method == 'setFeedBlocking');
+    expect((call.arguments as Map)['on'], isTrue);
+  });
+
+  testWidgets('expanding Schedule shows the editor in Every Day mode',
       (tester) async {
     // Tall surface so the whole editor fits without scroll gymnastics.
     await tester.binding.setSurfaceSize(const Size(1000, 2400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(const ProviderScope(child: BedrockApp()));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Downtime'));
+    await tester.tap(find.text('Schedule'));
     await tester.pumpAndSettle();
     // Every Day/Customize selector, defaulting to the shared Start/End window
     // (all seven days share one window).

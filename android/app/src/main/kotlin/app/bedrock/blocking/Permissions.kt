@@ -74,6 +74,19 @@ object Permissions {
         ),
     )
 
+    /**
+     * Bedtime mode lives inside Digital Wellbeing, which has no public settings
+     * action and differs per OEM. Best-effort: launch the Wellbeing app, then
+     * fall back to the top-level Settings so the user is never dead-ended.
+     * ponytail: no deep-link to the exact Bedtime screen; drops the user in
+     * Digital Wellbeing / Settings, which is as far as a public API reaches.
+     */
+    fun openBedtimeSettings(context: Context) {
+        val wellbeing = context.packageManager
+            .getLaunchIntentForPackage("com.google.android.apps.wellbeing")
+        open(context, wellbeing ?: Intent(Settings.ACTION_SETTINGS))
+    }
+
     private fun open(context: Context, intent: Intent) {
         context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }

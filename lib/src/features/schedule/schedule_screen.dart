@@ -241,9 +241,9 @@ class _DayCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkResponse(
+    return GestureDetector(
       onTap: onTap,
-      radius: 26,
+      behavior: HitTestBehavior.opaque,
       child: Container(
         width: 40,
         height: 40,

@@ -109,6 +109,23 @@ class ConfigStore(context: Context) {
         }.commit()
     }
 
+    /**
+     * Seconds the user must hold the $1 bypass button to reveal the hidden free
+     * reset. A deterrence knob, not engine-critical - stored directly, never
+     * through the freeze rules. Floored at [MIN_BYPASS_HOLD_SECONDS] so it can
+     * never collapse into an obvious one-tap escape.
+     */
+    @Synchronized
+    fun bypassHoldSeconds(): Int =
+        prefs.getInt(KEY_BYPASS_HOLD, DEFAULT_BYPASS_HOLD_SECONDS)
+
+    @Synchronized
+    fun setBypassHoldSeconds(seconds: Int) {
+        prefs.edit()
+            .putInt(KEY_BYPASS_HOLD, seconds.coerceAtLeast(MIN_BYPASS_HOLD_SECONDS))
+            .commit()
+    }
+
     /** Morning boundary: fold pending loosenings into the active config. */
     @Synchronized
     fun mergePending(): BedrockConfig {
@@ -133,5 +150,10 @@ class ConfigStore(context: Context) {
         const val KEY_PASSWORD_DAY = "hardcore_password_day"
         const val KEY_ONBOARDED = "onboarded"
         const val KEY_NAME = "display_name"
+        const val KEY_BYPASS_HOLD = "bypass_hold_seconds"
+
+        // Free-reset hold: default and floor, shared with the settings UI.
+        const val DEFAULT_BYPASS_HOLD_SECONDS = 15
+        const val MIN_BYPASS_HOLD_SECONDS = 10
     }
 }

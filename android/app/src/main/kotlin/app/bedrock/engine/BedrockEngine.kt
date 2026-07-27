@@ -1,6 +1,7 @@
 package app.bedrock.engine
 
 import android.content.Context
+import android.os.SystemClock
 import android.util.Log
 import app.bedrock.billing.BillingManager
 import app.bedrock.blocking.Allowlist
@@ -47,12 +48,28 @@ class BedrockEngine private constructor(private val context: Context) {
 
         if (snapshot.state == SessionState.ACTIVE) {
             val window = snapshot.window
-            if (window == null || nowMs >= window.closeEpochMs) {
+            if (window == null) {
                 dispatch(SessionEvent.WindowCloseDue)
+                evaluate(nowMs)
+                return
+            }
+            // Real time left, judged against the monotonic anchor so a forward
+            // wall-clock edit can't end the window early.
+            val remaining = WindowClock.remainingMs(window, nowMs, SystemClock.elapsedRealtime())
+            if (remaining <= 0) {
+                // A healthy engine closes on time via the WINDOW_CLOSE alarm.
+                // Being well past close on a normal evaluate means that alarm
+                // never fired - enforcement was down (force-stop cancels alarms) -
+                // so the night is a violation, not a clean close. Legitimate
+                // reboot/update catch-up is routed through recover() instead.
+                val gapped = nowMs - window.closeEpochMs > GAP_SLACK_MS
+                dispatch(if (gapped) SessionEvent.ViolationDetected else SessionEvent.WindowCloseDue)
                 evaluate(nowMs) // plan the next window
                 return
             }
-            scheduler.scheduleBoundaries(nowMs, AlarmScheduler.ACTION_WINDOW_CLOSE to window.closeEpochMs)
+            // Schedule off remaining real time, not the stored wall instant: under
+            // a forward clock edit the true close is `remaining` from now.
+            scheduler.scheduleBoundaries(nowMs, AlarmScheduler.ACTION_WINDOW_CLOSE to nowMs + remaining)
             return
         }
 
@@ -63,7 +80,7 @@ class BedrockEngine private constructor(private val context: Context) {
             return
         }
         if (nowMs >= next.openEpochMs) {
-            dispatch(SessionEvent.WindowOpenDue(next.toContext()))
+            dispatch(SessionEvent.WindowOpenDue(anchor(next.toContext(), nowMs)))
             store.snapshot().window?.let {
                 scheduler.scheduleBoundaries(nowMs, AlarmScheduler.ACTION_WINDOW_CLOSE to it.closeEpochMs)
             }
@@ -79,6 +96,42 @@ class BedrockEngine private constructor(private val context: Context) {
             )
         }
     }
+
+    /**
+     * Reboot / app-update recovery. The monotonic anchor resets with the uptime
+     * clock across a reboot, so re-derive from the (authoritative) boot wall
+     * clock: close cleanly if the window already ended while the phone was off,
+     * else re-anchor and carry on. Distinct from [evaluate] so the missed-close
+     * gap check there never mistakes a legitimate powered-off stretch for a
+     * force-stop.
+     */
+    @Synchronized
+    fun recover(nowMs: Long = System.currentTimeMillis()) {
+        val snap = store.snapshot()
+        val window = snap.window
+        if (snap.state == SessionState.ACTIVE && window != null) {
+            if (nowMs >= window.closeEpochMs) {
+                dispatch(SessionEvent.WindowCloseDue)
+            } else {
+                store.saveSnapshot(snap.copy(window = anchor(window, nowMs)))
+            }
+        }
+        evaluate(nowMs)
+    }
+
+    /**
+     * The guard service found it can't enforce (no accessibility service and no
+     * usage-access fallback). Flag the running window failed but keep it ACTIVE -
+     * ending downtime here would reward disabling the monitor.
+     */
+    @Synchronized
+    fun reportEnforcementGap() {
+        if (store.snapshot().state == SessionState.ACTIVE) dispatch(SessionEvent.GapDetected)
+    }
+
+    /** Stamp a window's monotonic anchor at the moment it opens. */
+    private fun anchor(window: WindowContext, nowMs: Long): WindowContext =
+        WindowClock.anchor(window, nowMs, SystemClock.elapsedRealtime())
 
     @Synchronized
     fun dispatch(event: SessionEvent): Snapshot {
@@ -102,20 +155,25 @@ class BedrockEngine private constructor(private val context: Context) {
     }
 
     /**
-     * Grant one app more time this window. Called by the blocker after a
-     * correct passcode. Marks the window unclean and (re)arms the expiry alarm.
+     * Grant one app more time. Called by the blocker after a correct passcode.
+     * Marks the window unclean and (re)arms the expiry alarm.
+     *
+     * Valid during a downtime window, and also whenever feed blocking is on,
+     * since that runs independently of windows and its blocker needs the same
+     * escape hatch. A grant taken outside a window dirties no window.
      */
     @Synchronized
     fun grantApp(pkg: String, kind: GrantKind, nowMs: Long = System.currentTimeMillis()) {
         val snapshot = store.snapshot()
-        if (snapshot.state != SessionState.ACTIVE) return
+        val inWindow = snapshot.state == SessionState.ACTIVE
+        if (!inWindow && !BlockingController.isFeedBlocking(context)) return
         val until = when (kind) {
             GrantKind.FIVE_MIN -> nowMs + 5 * 60_000L
             GrantKind.FIFTEEN_MIN -> nowMs + 15 * 60_000L
             GrantKind.REST_OF_WINDOW -> snapshot.window?.closeEpochMs ?: (nowMs + 15 * 60_000L)
         }
         BlockingController.grant(context, pkg, until)
-        if (!snapshot.grantUsed) store.saveSnapshot(snapshot.copy(grantUsed = true))
+        if (inWindow && !snapshot.grantUsed) store.saveSnapshot(snapshot.copy(grantUsed = true))
         rescheduleGrantExpiry(nowMs)
     }
 
@@ -129,6 +187,20 @@ class BedrockEngine private constructor(private val context: Context) {
         }
         rescheduleGrantExpiry(nowMs)
     }
+
+    /**
+     * In-app feed blocking, the user's own switch. Deliberately not part of
+     * [BedrockConfig]: it is not schedule state, the freeze rules do not apply,
+     * and the accessibility service needs to read it without the engine running.
+     * Routed through here anyway so the engine stays the single writer to
+     * [BlockingController].
+     */
+    @Synchronized
+    fun setFeedBlocking(on: Boolean) {
+        BlockingController.setFeedBlocking(context, on)
+    }
+
+    fun isFeedBlocking(): Boolean = BlockingController.isFeedBlocking(context)
 
     private fun rescheduleGrantExpiry(nowMs: Long) {
         BlockingController.earliestGrantExpiry(context, nowMs)?.let {
@@ -154,12 +226,6 @@ class BedrockEngine private constructor(private val context: Context) {
             "viewable" to viewable,
             "password" to if (viewable) store.hardcorePassword() else null,
         )
-    }
-
-    @Synchronized
-    fun regenerateHardcorePassword(): Map<String, Any?> {
-        if (!passwordViewable()) return mapOf("viewable" to false, "password" to null)
-        return mapOf("viewable" to true, "password" to store.rotateHardcorePassword())
     }
 
     /** Rotate the code and reveal it to the waiting blocker; returns the new code. */
@@ -204,11 +270,14 @@ class BedrockEngine private constructor(private val context: Context) {
             val cap = nowMs + 24 * 60 * 60_000L
             val close = NightPlanner.nextNight(nowMs, zone(), store.activeConfig())
                 ?.closeEpochMs?.coerceAtMost(cap) ?: cap
-            val ctx = WindowContext(
-                windowKey = "manual-" + Instant.ofEpochMilli(nowMs),
-                openEpochMs = nowMs,
-                closeEpochMs = close,
-                manual = true,
+            val ctx = anchor(
+                WindowContext(
+                    windowKey = "manual-" + Instant.ofEpochMilli(nowMs),
+                    openEpochMs = nowMs,
+                    closeEpochMs = close,
+                    manual = true,
+                ),
+                nowMs,
             )
             dispatch(SessionEvent.WindowOpenDue(ctx))
             scheduler.scheduleBoundaries(nowMs, AlarmScheduler.ACTION_WINDOW_CLOSE to ctx.closeEpochMs)
@@ -223,10 +292,13 @@ class BedrockEngine private constructor(private val context: Context) {
     @Synchronized
     fun startDemoSession(windDownSeconds: Int, sleepSeconds: Int) {
         val nowMs = System.currentTimeMillis()
-        val ctx = WindowContext(
-            windowKey = "demo-" + Instant.ofEpochMilli(nowMs),
-            openEpochMs = nowMs,
-            closeEpochMs = nowMs + (windDownSeconds + sleepSeconds) * 1000L,
+        val ctx = anchor(
+            WindowContext(
+                windowKey = "demo-" + Instant.ofEpochMilli(nowMs),
+                openEpochMs = nowMs,
+                closeEpochMs = nowMs + (windDownSeconds + sleepSeconds) * 1000L,
+            ),
+            nowMs,
         )
         dispatch(SessionEvent.WindowOpenDue(ctx))
         scheduler.scheduleBoundaries(nowMs, AlarmScheduler.ACTION_WINDOW_CLOSE to ctx.closeEpochMs)
@@ -290,6 +362,14 @@ class BedrockEngine private constructor(private val context: Context) {
 
     companion object {
         private const val TAG = "BedrockEngine"
+
+        /**
+         * How far past a window's close a normal evaluate may land before it
+         * counts as a coverage gap rather than clean-close jitter. The exact,
+         * Doze-exempt close alarm fires within seconds, so this only forgives
+         * scheduling slack; a real force-stop lands minutes-to-hours late.
+         */
+        private const val GAP_SLACK_MS = 5 * 60 * 1000L
 
         @Volatile
         private var instance: BedrockEngine? = null
