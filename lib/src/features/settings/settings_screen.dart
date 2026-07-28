@@ -25,6 +25,9 @@ class SettingsScreen extends ConsumerWidget {
           const SectionLabel('You'),
           const _NameSection(),
           const SizedBox(height: 36),
+          const SectionLabel('Feeds'),
+          const _FeedBlockSection(),
+          const SizedBox(height: 36),
           const SectionLabel('Downtime'),
           SettingGroup(
             rows: [
@@ -83,6 +86,53 @@ class SettingsScreen extends ConsumerWidget {
         ],
       ],
     );
+  }
+}
+
+/// In-app feed blocking. Independent of downtime - it runs around the clock -
+/// so it lives in its own section rather than under Downtime.
+class _FeedBlockSection extends ConsumerWidget {
+  const _FeedBlockSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final view = ref.watch(feedBlockingProvider).valueOrNull;
+    final on = view?.on ?? false;
+    final pendingOff = view?.offAt;
+
+    Future<void> set(bool next) async {
+      await ref.read(engineChannelProvider).setFeedBlocking(next);
+      ref.invalidate(feedBlockingProvider);
+    }
+
+    return SettingGroup(
+      rows: [
+        SettingRow(
+          title: 'Block Reels and Shorts',
+          subtitle: pendingOff == null
+              ? 'Instagram and YouTube, all day. Your DMs, search and messages '
+                  'keep working.'
+              : 'Turning off ${_relative(pendingOff)}. Bedrock never unblocks '
+                  'on impulse - tap to keep feeds blocked.',
+          // The switch reads the effective state, so it stays on until the
+          // pending switch-off actually lands.
+          onTap: () => set(!on),
+          trailing: Switch(value: on, onChanged: set),
+        ),
+      ],
+    );
+  }
+
+  /// "in 21 hours" / "in 12 minutes" - the wait is the whole point, so say it
+  /// in units the user feels rather than a timestamp they have to subtract.
+  static String _relative(DateTime when) {
+    final left = when.difference(DateTime.now());
+    if (left.isNegative) return 'any moment now';
+    if (left.inHours >= 1) {
+      return 'in ${left.inHours} hour${left.inHours == 1 ? '' : 's'}';
+    }
+    final mins = left.inMinutes + 1;
+    return 'in $mins minute${mins == 1 ? '' : 's'}';
   }
 }
 

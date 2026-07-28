@@ -13,10 +13,10 @@ object Acknowledgement {
 
     /** The paragraph the user must copy out to reset their code for free. */
     const val TEXT =
-        "I understand that my phone is designed to be addictive. Choosing to use it " +
-            "right now can worsen my mood, drain my energy tomorrow, and pull me away " +
-            "from what I actually care about. I am resetting my code on purpose, and I " +
-            "take responsibility for how I spend the rest of my night."
+        "I understand these apps are designed to be addictive. The feed will not make " +
+            "me happy - it takes my time and gives me nothing back. I am choosing to " +
+            "unblock it right now, on purpose, and I take responsibility for how I " +
+            "spend the rest of my day."
 
     /** Whether [typed] matches [TEXT] once both are normalized. */
     fun accepts(typed: String): Boolean = normalize(typed) == normalize(TEXT)

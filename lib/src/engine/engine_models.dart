@@ -135,7 +135,7 @@ class EngineConfig {
           NightPlan.fromJson(plan as Map<String, Object?>),
         ),
       ),
-      windDownMinutes: (json['windDownMinutes'] as num?)?.toInt() ?? 60,
+      windDownMinutes: (json['windDownMinutes'] as num?)?.toInt() ?? 30,
       allowlist:
           (json['allowlist'] as List<Object?>? ?? []).cast<String>().toSet(),
     );
@@ -183,6 +183,24 @@ class HardcorePasswordView {
       );
 }
 
+/// In-app feed blocking as the engine reports it. Turning it off is a
+/// loosening change, so it lands a day later: [on] stays true until [offAt]
+/// passes, and a non-null [offAt] means a switch-off is pending.
+class FeedBlockView {
+  const FeedBlockView({required this.on, this.offAt});
+
+  final bool on;
+  final DateTime? offAt;
+
+  factory FeedBlockView.fromWire(Map<Object?, Object?> wire) {
+    final ms = (wire['offAtMs'] as num?)?.toInt() ?? 0;
+    return FeedBlockView(
+      on: wire['on'] as bool? ?? false,
+      offAt: ms == 0 ? null : DateTime.fromMillisecondsSinceEpoch(ms),
+    );
+  }
+}
+
 /// Sparse change request; only non-null fields are sent. The native
 /// ChangeClassifier decides what applies now versus at the next window.
 class ConfigPatch {
@@ -219,55 +237,6 @@ class ConfigView {
   factory ConfigView.fromWire(Map<Object?, Object?> wire) => ConfigView(
         active: EngineConfig.fromJsonString(wire['active'] as String),
         pendingRaw: wire['pending'] as String,
-      );
-}
-
-/// How a recorded window ended. Mirrors WindowOutcome in the Kotlin engine.
-enum WindowOutcome {
-  clean,
-  unlocked,
-  violated;
-
-  static WindowOutcome fromWire(String value) =>
-      WindowOutcome.values.byName(value.toLowerCase());
-}
-
-/// One recorded window, for the recent-windows strip.
-class RecentWindow {
-  const RecentWindow({required this.windowKey, required this.outcome});
-
-  /// ISO yyyy-MM-dd of the day the window started on.
-  final String windowKey;
-  final WindowOutcome outcome;
-
-  factory RecentWindow.fromWire(Map<Object?, Object?> wire) => RecentWindow(
-        windowKey: wire['windowKey'] as String,
-        outcome: WindowOutcome.fromWire(wire['outcome'] as String),
-      );
-}
-
-/// Read-only projection of local usage stats. The engine does the counting.
-class StatsView {
-  const StatsView({
-    required this.currentStreak,
-    required this.windowsKept,
-    required this.totalWindows,
-    required this.recent,
-  });
-
-  /// Consecutive clean windows ending at the most recent recorded window.
-  final int currentStreak;
-  final int windowsKept;
-  final int totalWindows;
-  final List<RecentWindow> recent;
-
-  factory StatsView.fromWire(Map<Object?, Object?> wire) => StatsView(
-        currentStreak: (wire['currentStreak'] as num?)?.toInt() ?? 0,
-        windowsKept: (wire['windowsKept'] as num?)?.toInt() ?? 0,
-        totalWindows: (wire['totalWindows'] as num?)?.toInt() ?? 0,
-        recent: (wire['recent'] as List<Object?>? ?? const [])
-            .map((e) => RecentWindow.fromWire(e as Map<Object?, Object?>))
-            .toList(),
       );
 }
 

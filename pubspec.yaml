@@ -1,5 +1,5 @@
 name: bedrock
-description: "Bedrock - a bedtime lockdown app. Your phone becomes an alarm clock at bedtime."
+description: "Bedrock - a social media and app blocker. Blocks infinite-scroll feeds and chosen apps during downtime."
 publish_to: 'none'
 
 version: 0.2.0+5

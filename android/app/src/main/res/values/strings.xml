@@ -4,11 +4,13 @@
     <string name="widget_downtime_description">Shows your current or next downtime window.</string>
     <string name="accessibility_service_description">
         During your scheduled downtime window, Bedrock watches which app comes
-        to the front and blocks it if it is not on your allowed list. Inside the
-        few social apps you choose, it also checks the screen layout to tell an
-        endless feed apart from your messages, so it can block the feed and
-        leave the rest of the app working. It never reads message text,
-        captions, or anything you type; nothing it reads is stored or sent
-        anywhere. It does nothing outside your downtime window.
+        to the front and blocks it if it is not on your allowed list. In
+        Instagram and YouTube only, it also checks the layout of the screen to
+        tell an endless feed (Reels, Shorts, the home feed) apart from the rest
+        of the app, so it can block the feed and leave your messages and search
+        working; that part runs at all times, not only during downtime. It
+        never reads message text, captions, or anything you type, and it never
+        looks at the screen of any other app. Nothing it reads is stored or
+        sent anywhere.
     </string>
 </resources>

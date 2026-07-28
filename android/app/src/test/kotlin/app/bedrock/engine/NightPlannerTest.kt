@@ -98,12 +98,12 @@ class NightPlannerTest {
 
     @Test
     fun `wind-down lead opens the window before bedtime`() {
-        // Default 60-min lead: bedtime 23:00 -> downtime opens 22:00.
-        val leadCfg = BedrockConfig() // windDownMinutes = 60
+        // Default 30-min lead: bedtime 23:00 -> downtime opens 22:30.
+        val leadCfg = BedrockConfig() // windDownMinutes = 30
         val window = NightPlanner.nextNight(at("2026-07-15", "20:00"), zone, leadCfg)
         assertNotNull(window)
         assertEquals(LocalDate.parse("2026-07-15"), window.windowKey)
-        assertEquals(at("2026-07-15", "22:00"), window.openEpochMs)
+        assertEquals(at("2026-07-15", "22:30"), window.openEpochMs)
         assertEquals(at("2026-07-16", "07:00"), window.closeEpochMs)
     }
 

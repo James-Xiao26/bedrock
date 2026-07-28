@@ -84,6 +84,14 @@ class BlockerActivity : ComponentActivity() {
                         engine.billing.launchBypassPurchase(this) { /* error -> shown inline */ }
                     },
                     onFreeReset = { engine.resetCodeFree() },
+                    // The paid feed bypass buys a scroll session, not a new code:
+                    // rotating it here would silently invalidate a code the user
+                    // wrote down for tonight, and they'd never see the new one.
+                    onFeedPurchase = {
+                        engine.onPaidBypass = { runOnUiThread { grantFeed(engine, pkg) } }
+                        engine.billing.launchBypassPurchase(this) { /* error -> shown inline */ }
+                    },
+                    onFeedUnblock = { grantFeed(engine, pkg) },
                     onLeave = { goHome(); finish() },
                 )
             }
@@ -97,8 +105,19 @@ class BlockerActivity : ComponentActivity() {
 
     override fun onStop() {
         if (showing === this) showing = null
-        BedrockEngine.get(applicationContext).onCodeReset = null
+        BedrockEngine.get(applicationContext).let {
+            it.onCodeReset = null
+            // Back to the rotate-and-reveal default, so a purchase that lands
+            // after this screen is gone still does something for the user.
+            it.onPaidBypass = null
+        }
         super.onStop()
+    }
+
+    /** Earned a feed session: 15 minutes for that app, then get out of the way. */
+    private fun grantFeed(engine: BedrockEngine, pkg: String) {
+        engine.grantApp(pkg, GrantKind.FIFTEEN_MIN)
+        finish()
     }
 
     private fun goHome() {
@@ -140,8 +159,13 @@ private fun BlockerScreen(
     onGrant: (GrantKind) -> Unit,
     onReset: (onRevealed: (String) -> Unit) -> Unit,
     onFreeReset: () -> String,
+    onFeedPurchase: () -> Unit,
+    onFeedUnblock: () -> Unit,
     onLeave: () -> Unit,
 ) {
+    // A feed block is not a downtime block: the app itself still works, and the
+    // way out is $1 or the note, never the passcode.
+    val feedMode = surfaceLabel.isNotEmpty()
     var unlocked by remember { mutableStateOf(false) }
     var typed by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
@@ -176,7 +200,47 @@ private fun BlockerScreen(
             textAlign = TextAlign.Center,
         )
 
-        if (!unlocked && freeMode) {
+        if (feedMode && freeMode) {
+            Text(
+                "Copy this out word for word to unblock it for 15 minutes.",
+                color = Color(0xFF8A8A9E),
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                Acknowledgement.TEXT,
+                color = Color(0xFF6A6A7E),
+                textAlign = TextAlign.Center,
+            )
+            OutlinedTextField(
+                value = acknowledged,
+                onValueChange = { acknowledged = it },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Button(
+                onClick = onFeedUnblock,
+                enabled = Acknowledgement.accepts(acknowledged),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Unblock for 15 minutes")
+            }
+            OutlinedButton(onClick = { freeMode = false; acknowledged = "" }) {
+                Text("Back")
+            }
+        } else if (feedMode) {
+            // No passcode field: the code is viewable in Settings outside
+            // downtime, so accepting it here would make the whole ladder a
+            // two-tap round trip. Feeds get their own gate - $1 or the note.
+            Text(
+                "Unblock it for 15 minutes for \$1 - it needs no one but you.",
+                color = Color(0xFF6A6A7E),
+                textAlign = TextAlign.Center,
+            )
+            HoldableBypassButton(
+                holdMs = holdToFreeMs,
+                onTap = onFeedPurchase,
+                onHold = { freeMode = true },
+            )
+        } else if (!unlocked && freeMode) {
             Text(
                 "Forgot your code? Reset it for free by copying the note below word for word.",
                 color = Color(0xFF8A8A9E),

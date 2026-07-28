@@ -24,7 +24,7 @@ class AcknowledgementTest {
     @Test
     fun `rejects a missing or changed word`() {
         assertFalse(Acknowledgement.accepts(Acknowledgement.TEXT.replace("addictive", "great")))
-        assertFalse(Acknowledgement.accepts(Acknowledgement.TEXT.replaceFirst("phone", "")))
+        assertFalse(Acknowledgement.accepts(Acknowledgement.TEXT.replaceFirst("feed", "")))
     }
 
     @Test

@@ -23,16 +23,16 @@ Living checklist of getting Bedrock onto the Play Store. Update the status marks
 - [x] Phone number verified. Developer email still to confirm (public on store listing — use a dedicated email, not personal)
 - [x] Payments profile set up (legal name, bank, tax info) — bank account verified.
 - [x] Signed release AAB built — upload keystore at `C:/Users/Jimmy/bedrock-upload.jks` (alias `upload`), Gradle reads `android/key.properties` (gitignored). Output: `build/app/outputs/bundle/release/app-release.aab`. BACK UP THE KEYSTORE.
-- [x] App created in console: name `Bedrock: Bedtime App Blocker`, package `app.bedrock`, free app.
+- [x] App created in console: name `Bedrock: Social Media Blocker`, package `app.bedrock`, free app.
 - [ ] **App content** declarations:
   - [x] Privacy policy — live at `https://bedrock-app.github.io/legal/privacy-policy.html` (hosted via free GitHub org `bedrock-app`, repo `legal`, Pages from root).
   - [x] App access / sign-in — "no restrictions" (Bedrock has no login).
-  - [ ] Ads — declare "No, contains no ads".
-  - [ ] Content rating questionnaire.
-  - [ ] Target audience & content.
-  - [ ] Data safety form — must say **collects/shares NO data** to match the privacy policy.
+  - [x] Ads — declared "No, contains no ads".
+  - [x] Content rating questionnaire.
+  - [x] Target audience & content.
+  - [x] Data safety form — says **collects/shares NO data**, matching the privacy policy.
   - [ ] **Accessibility (Permissions) declaration** — rewritten for feed blocking, see below. This is the review risk.
-- [ ] Main store listing (short + full description, icon, screenshots, feature graphic) — **title is still `Bedrock: Bedtime App Blocker`, wrong since the pivot; rewrite before submitting**.
+- [ ] Main store listing (short + full description, icon, screenshots, feature graphic). Title updated to `Bedrock: Social Media Blocker` on 2026-07-28; descriptions/category still need the post-pivot copy from the `marketing` skill.
 - [ ] Upload AAB to a closed-testing track
 - [ ] Closed-testing track with **12 testers held 14 continuous days** (the launch bottleneck — see below)
 - [ ] Apply for production access

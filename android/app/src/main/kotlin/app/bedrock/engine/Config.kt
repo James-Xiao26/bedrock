@@ -29,7 +29,7 @@ data class BedrockConfig(
     /** ISO day-of-week (1=Mon..7=Sun) -> the block window STARTING that day. */
     val schedule: Map<Int, NightPlan> = defaultSchedule,
     /** How long before bedtime downtime begins (the wind-down lead). */
-    val windDownMinutes: Int = 60,
+    val windDownMinutes: Int = 30,
     /** Packages the user allows through during a window (system apps are always allowed). */
     val allowlist: Set<String> = emptySet(),
 ) {

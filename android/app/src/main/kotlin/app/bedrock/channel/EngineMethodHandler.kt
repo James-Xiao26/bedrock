@@ -99,8 +99,6 @@ class EngineMethodHandler(private val context: Context) : MethodChannel.MethodCa
                 result.success(null)
             }
 
-            "getStats" -> result.success(engine.stats.summary().toWire())
-
             "getHardcorePassword" -> result.success(engine.hardcorePasswordView())
 
             "getSessionState" -> {
@@ -121,7 +119,7 @@ class EngineMethodHandler(private val context: Context) : MethodChannel.MethodCa
                 result.success(null)
             }
 
-            "getFeedBlocking" -> result.success(engine.isFeedBlocking())
+            "getFeedBlocking" -> result.success(engine.feedBlockingView())
 
             "setFeedBlocking" -> {
                 engine.setFeedBlocking(call.argument<Boolean>("on") ?: false)

@@ -1,6 +1,6 @@
 # Bedrock
 
-A bedtime lockdown app: users set per-weekday bed/wake times; during that window the phone becomes a dim night clock and all other apps are blocked.
+A social media and app blocker: users set per-weekday downtime windows; during that window chosen apps are blocked, and inside Instagram and YouTube the infinite-scroll feeds (Reels, Shorts, home feed) are blocked while DMs and search stay usable.
 Android-first (Google Play), iOS later via the Screen Time API.
 Full product plan and locked decisions: `~/.claude/plans/i-want-to-create-modular-cookie.md`.
 

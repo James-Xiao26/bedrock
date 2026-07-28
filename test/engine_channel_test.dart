@@ -45,16 +45,10 @@ void main() {
             'active': _activeConfigJson(),
             'pending': '{}',
           },
-        'getStats' => <Object?, Object?>{
-            'currentStreak': 0,
-            'windowsKept': 0,
-            'totalWindows': 0,
-            'recent': <Object?>[],
-          },
         'getHardcorePassword' =>
           <Object?, Object?>{'viewable': false, 'password': null},
         'isOnboarded' => true,
-        'getFeedBlocking' => false,
+        'getFeedBlocking' => <Object?, Object?>{'on': true, 'offAtMs': 0},
         _ => null,
       };
     });
@@ -106,23 +100,29 @@ void main() {
     await tester.pumpAndSettle();
     // Today status reflects the IDLE session.
     expect(find.text('Apps unblocked'), findsOneWidget);
-    // Schedule and Stats are collapsible section headers, not tabs.
+    // Schedule is a collapsible section header, not a tab.
     expect(find.text('Schedule'), findsOneWidget);
-    expect(find.text('Stats'), findsOneWidget);
     // Settings lives behind a gear icon in the top-right.
     expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
   });
 
   testWidgets('the feed toggle sends its new value to the engine',
       (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(const ProviderScope(child: BedrockApp()));
     await tester.pumpAndSettle();
-    expect(find.text('Block feeds'), findsOneWidget);
+    // The toggle lives in Settings, not on the home screen.
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
+    expect(find.text('Block Reels and Shorts'), findsOneWidget);
 
+    // The fake reports feed blocking on, so tapping asks to turn it off. The
+    // engine, not the UI, is what delays that by a day.
     await tester.tap(find.byType(Switch));
     await tester.pumpAndSettle();
     final call = calls.singleWhere((c) => c.method == 'setFeedBlocking');
-    expect((call.arguments as Map)['on'], isTrue);
+    expect((call.arguments as Map)['on'], isFalse);
   });
 
   testWidgets('expanding Schedule shows the editor in Every Day mode',

@@ -26,12 +26,18 @@ object BlockingController {
     private const val KEY_ALLOWED = "allowed"
     private const val KEY_GRANTS = "grants"
     private const val KEY_FEED = "feed_block_enabled"
+    private const val KEY_FEED_OFF_AT = "feed_block_off_at"
+
+    /** How long after the user asks that feed blocking actually stops. */
+    const val FEED_OFF_DELAY_MS = 24 * 60 * 60_000L
 
     private data class State(
         val active: Boolean,
         val allowed: Set<String>,
         val grants: Map<String, Long>,
         val feedBlocking: Boolean,
+        /** When a requested switch-off lands; 0 when none is pending. */
+        val feedOffAt: Long,
     )
 
     private val grantSerializer = MapSerializer(String.serializer(), Long.serializer())
@@ -46,13 +52,13 @@ object BlockingController {
 
     /** Set active/allowed. Always clears grants - both calls are window boundaries. */
     fun update(context: Context, active: Boolean, allowed: Set<String>) {
-        val feed = state(context).feedBlocking
+        val before = state(context)
         prefs(context).edit()
             .putBoolean(KEY_ACTIVE, active)
             .putStringSet(KEY_ALLOWED, allowed)
             .remove(KEY_GRANTS)
             .commit()
-        cached = State(active, allowed, emptyMap(), feed)
+        cached = State(active, allowed, emptyMap(), before.feedBlocking, before.feedOffAt)
         Log.i(TAG, "blocking=${if (active) "ON" else "OFF"} allowed=${allowed.size} pkgs")
     }
 
@@ -60,14 +66,39 @@ object BlockingController {
      * Turn in-app feed blocking on or off. Independent of downtime windows, so
      * unlike [update] this writes only its own key and leaves grants alone -
      * routing it through [update] would silently drop an active passcode grant.
+     *
+     * Turning it OFF is a loosening change, so it lands [FEED_OFF_DELAY_MS]
+     * later rather than immediately - the same "never loosens tonight" rule the
+     * schedule follows. Otherwise one tap here would be a permanently cheaper
+     * escape than the per-session gate on the blocker. Turning it back ON is
+     * instant and cancels a pending switch-off.
      */
-    fun setFeedBlocking(context: Context, on: Boolean) {
-        prefs(context).edit().putBoolean(KEY_FEED, on).commit()
-        cached = state(context).copy(feedBlocking = on)
-        Log.i(TAG, "feedBlocking=${if (on) "ON" else "OFF"}")
+    fun setFeedBlocking(context: Context, on: Boolean, nowMs: Long = System.currentTimeMillis()) {
+        val offAt = if (on) 0L else nowMs + FEED_OFF_DELAY_MS
+        prefs(context).edit()
+            .putBoolean(KEY_FEED, true)
+            .putLong(KEY_FEED_OFF_AT, offAt)
+            .commit()
+        cached = state(context).copy(feedBlocking = true, feedOffAt = offAt)
+        Log.i(TAG, "feedBlocking=${if (on) "ON" else "OFF at $offAt"}")
     }
 
-    fun isFeedBlocking(context: Context): Boolean = state(context).feedBlocking
+    /**
+     * Whether feeds are blocked right now. The pending switch-off applies itself
+     * on read, deliberately: the accessibility service consults this without the
+     * engine running, so correctness can't depend on an alarm having fired.
+     */
+    fun isFeedBlocking(context: Context, nowMs: Long = System.currentTimeMillis()): Boolean {
+        val s = state(context)
+        return feedBlockingInForce(s.feedBlocking, s.feedOffAt, nowMs)
+    }
+
+    /** The [isFeedBlocking] decision with no Context, so JUnit can cover it. */
+    fun feedBlockingInForce(enabled: Boolean, offAtMs: Long, nowMs: Long): Boolean =
+        enabled && (offAtMs == 0L || nowMs < offAtMs)
+
+    /** When a requested switch-off lands, or 0 when none is pending. For the UI. */
+    fun feedOffAt(context: Context): Long = state(context).feedOffAt
 
     /**
      * True when a feed surface inside [packageName] must bounce right now.
@@ -75,9 +106,8 @@ object BlockingController {
      * already bought for an app covers its feed too.
      */
     fun shouldBlockFeed(context: Context, packageName: String): Boolean {
-        val s = state(context)
-        if (!s.feedBlocking) return false
-        val grantUntil = s.grants[packageName] ?: return true
+        if (!isFeedBlocking(context)) return false
+        val grantUntil = state(context).grants[packageName] ?: return true
         return grantUntil <= System.currentTimeMillis()
     }
 
@@ -147,6 +177,7 @@ object BlockingController {
                     ?.let { Json.decodeFromString(grantSerializer, it) }
                     ?: emptyMap(),
                 feedBlocking = p.getBoolean(KEY_FEED, false),
+                feedOffAt = p.getLong(KEY_FEED_OFF_AT, 0L),
             )
         }.also { cached = it }
 

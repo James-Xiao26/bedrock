@@ -55,8 +55,11 @@ class EngineChannel {
   /// Whether in-app feed blocking is on. Runs independently of downtime
   /// windows: when on, feeds inside the watched social apps stay blocked
   /// around the clock while the rest of each app keeps working.
-  Future<bool> getFeedBlocking() async =>
-      await _method.invokeMethod<bool>('getFeedBlocking') ?? false;
+  Future<FeedBlockView> getFeedBlocking() async {
+    final wire =
+        await _method.invokeMethod<Map<Object?, Object?>>('getFeedBlocking');
+    return FeedBlockView.fromWire(wire!);
+  }
 
   Future<void> setFeedBlocking(bool on) =>
       _method.invokeMethod('setFeedBlocking', {'on': on});
@@ -70,9 +73,6 @@ class EngineChannel {
 
   Future<void> openAccessibilitySettings() =>
       _method.invokeMethod('openAccessibilitySettings');
-
-  Future<void> openUsageAccessSettings() =>
-      _method.invokeMethod('openUsageAccessSettings');
 
   Future<void> openOverlaySettings() =>
       _method.invokeMethod('openOverlaySettings');
@@ -124,12 +124,6 @@ class EngineChannel {
   Future<Set<String>> getSystemAllowlist() async {
     final wire = await _method.invokeMethod<List<Object?>>('getSystemAllowlist');
     return (wire ?? const []).map((e) => e as String).toSet();
-  }
-
-  /// Aggregated local sleep stats (streak, totals, recent nights).
-  Future<StatsView> getStats() async {
-    final wire = await _method.invokeMethod<Map<Object?, Object?>>('getStats');
-    return StatsView.fromWire(wire!);
   }
 
   /// The hardcore escape code, if the engine will currently reveal it.

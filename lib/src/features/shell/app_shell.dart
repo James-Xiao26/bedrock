@@ -6,11 +6,10 @@ import '../../theme/app_theme.dart';
 import '../../widgets/collapsible_section.dart';
 import '../schedule/schedule_screen.dart';
 import '../settings/settings_screen.dart';
-import '../stats/stats_screen.dart';
 import '../tonight/tonight_screen.dart';
 
-/// The whole app on one calm surface: Today at the top, then the Schedule and
-/// Stats editors as collapsible blocks, with Settings tucked behind a gear in
+/// The whole app on one calm surface: Today at the top, then the Schedule
+/// editor as a collapsible block, with Settings tucked behind a gear in
 /// the top-right. No bottom nav; the engine providers are shared via Riverpod.
 class AppShell extends ConsumerWidget {
   const AppShell({super.key});
@@ -18,7 +17,6 @@ class AppShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final config = ref.watch(configProvider).valueOrNull;
-    final stats = ref.watch(statsProvider).valueOrNull;
 
     return Scaffold(
       body: SafeArea(
@@ -49,11 +47,6 @@ class AppShell extends ConsumerWidget {
               title: 'Schedule',
               summary: config == null ? null : scheduleSummary(context, config),
               child: const ScheduleContent(),
-            ),
-            CollapsibleSection(
-              title: 'Stats',
-              summary: stats == null ? null : statsSummary(stats),
-              child: const StatsContent(),
             ),
           ],
         ),

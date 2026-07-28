@@ -28,7 +28,6 @@ enum class GrantKind { FIVE_MIN, FIFTEEN_MIN, REST_OF_WINDOW }
 class BedrockEngine private constructor(private val context: Context) {
 
     val store = ConfigStore(context)
-    val stats = StatsStore(context)
     private val scheduler = AlarmScheduler(context)
     val billing = BillingManager(context, ::onBypassPurchased)
 
@@ -36,9 +35,22 @@ class BedrockEngine private constructor(private val context: Context) {
     @Volatile
     var onCodeReset: ((String) -> Unit)? = null
 
+    /**
+     * What a completed $1 purchase should do, set by the blocker that launched
+     * it. Null means "rotate and reveal the code", the downtime behaviour and
+     * the safe default: [BillingManager.reconcile] settles purchases that
+     * completed while no blocker was showing, and that must never strand a
+     * paid user.
+     */
+    @Volatile
+    var onPaidBypass: (() -> Unit)? = null
+
     init {
         // Crash between purchase and consume must never strand a paid user.
         billing.reconcile()
+        // Stats are gone; drop the window log older installs still carry.
+        context.getSharedPreferences("bedrock_engine", Context.MODE_PRIVATE)
+            .edit().remove("window_records").apply()
     }
 
     @Synchronized
@@ -202,6 +214,15 @@ class BedrockEngine private constructor(private val context: Context) {
 
     fun isFeedBlocking(): Boolean = BlockingController.isFeedBlocking(context)
 
+    /**
+     * Feed blocking for the settings screen: whether it's on right now, plus
+     * when a requested switch-off lands (0 when none is pending).
+     */
+    fun feedBlockingView(): Map<String, Any?> = mapOf(
+        "on" to BlockingController.isFeedBlocking(context),
+        "offAtMs" to BlockingController.feedOffAt(context),
+    )
+
     private fun rescheduleGrantExpiry(nowMs: Long) {
         BlockingController.earliestGrantExpiry(context, nowMs)?.let {
             scheduler.scheduleOne(AlarmScheduler.ACTION_GRANT_EXPIRY, it)
@@ -235,9 +256,10 @@ class BedrockEngine private constructor(private val context: Context) {
         return fresh
     }
 
-    /** Paid reset ($1): rotate the code and reveal it. */
+    /** Paid bypass ($1). The feed blocker grants time instead of touching the code. */
     private fun onBypassPurchased() {
-        rotateAndReveal()
+        val handler = onPaidBypass
+        if (handler != null) handler() else rotateAndReveal()
     }
 
     /**
@@ -320,14 +342,10 @@ class BedrockEngine private constructor(private val context: Context) {
                 store.mergePending()
                 EngineEventStreamer.emit("configChanged")
             }
-            is Effect.RecordWindow -> {
+            // ponytail: nothing is persisted - the stats screen is gone and the
+            // app keeps no history. Log only, for debugging a window close.
+            is Effect.RecordWindow ->
                 Log.i(TAG, "window ${effect.window?.windowKey}: ${effect.outcome}")
-                effect.window?.let {
-                    stats.record(
-                        WindowRecord(it.windowKey, it.openEpochMs, it.closeEpochMs, effect.outcome.name),
-                    )
-                }
-            }
             Effect.StartBlocking -> {
                 BlockingController.update(
                     context,
